@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meu Chatbot Gemini</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="chat-wrapper">
+        <h1>Chatbot com GemiDIO</h1>
+        <div id="chat-container">
+            <!-- As mensagens do chat aparecerão aqui -->
+            <div class="message bot-message">Hmpf, o que faz em meus aposentos?</div>
+        </div>
+        <div id="input-area">
+            <input type="text" id="message-input" placeholder="Digite sua mensagem aqui...">
+            <button id="send-button">Enviar</button>
+            <button id="reset-button" title="Limpar histórico da conversa no servidor">Resetar Chat</button>
+        </div>
+        <div id="status-area" class="status"></div>
+    </div>
+
+    <script src="client.js"></script>
+</body>
+</html>
