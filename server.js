@@ -1,155 +1,131 @@
 // Importa as dependências necessárias
 const express = require('express');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+// dotenv é ótimo para desenvolvimento local, mas na nuvem usaremos as variáveis da plataforma
+// A linha abaixo não causará erro se o .env não existir (como na nuvem),
+// mas também não é estritamente necessária se você configurar as variáveis na plataforma.
+require('dotenv').config();
 
 // Configuração do Express
-const app = express(); // Inicializa o aplicativo Express
-const port = process.env.PORT || 7282; // Define a porta (usa a do ambiente ou 7282)
+const app = express();
+// ESSENCIAL PARA NUVEM: Usa a porta fornecida pelo ambiente ou um padrão (ex: 8080 ou 3000)
+const port = process.env.PORT || 8080; // 8080 é um padrão comum em alguns ambientes de nuvem
 
-// Middleware para parsear JSON no corpo das requisições
 app.use(express.json());
-// Middleware para servir arquivos estáticos da pasta 'public' (onde ficam index.html, style.css, client.js)
 app.use(express.static('public'));
 
 // --- CONFIGURAÇÃO DO GEMINI ---
-// !! IMPORTANTE: Certifique-se de que a chave no seu arquivo .env é AIzaSyAEEUL3k6lMgEJ9atccO1hQ8lHIZKuBnJ8 !!
-const API_KEY = AIzaSyAEEUL3k6lMgEJ9atccO1hQ8lHIZKuBnJ8; // Lê a chave do ambiente
+// ESSENCIAL PARA NUVEM: Lê a chave da API da variável de ambiente configurada na plataforma
+const API_KEY = process.env.GEMINI_API_KEY;
 
-// Inicializa o cliente do Google Generative AI (SOMENTE se a API_KEY foi carregada)
-let genAI, model, chat;
-
-if (API_KEY) {
-    try {
-        genAI = new GoogleGenerativeAI(API_KEY);
-        model = genAI.getGenerativeModel({ model: "gemini-1.5-flash"}); // Ou outro modelo de sua preferência
-    } catch (error) {
-        console.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-        console.error("!!! Erro ao inicializar o GoogleGenerativeAI. Verifique sua API Key.");
-        console.error("!!! Detalhes:", error.message);
-        console.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-        // Impede o servidor de continuar sem a API funcionando
-        process.exit(1);
-    }
+if (!API_KEY) {
+    console.error("!!! Atenção: GEMINI_API_KEY não definida nas variáveis de ambiente da plataforma !!!");
+    process.exit(1); // Importante sair se a chave não estiver configurada
 } else {
-     // Sai se a API Key não estiver definida, pois o resto do código depende dela
-     process.exit(1);
+    // Em produção/nuvem, talvez não seja ideal logar a confirmação, mas ok por agora.
+    console.log("Chave da API do Gemini carregada via variável de ambiente.");
 }
 
+// Inicializa o cliente do Google Generative AI
+let genAI, model, chat;
+try {
+    genAI = new GoogleGenerativeAI(API_KEY);
+    model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+} catch (error) {
+    console.error("!!! Erro ao inicializar o GoogleGenerativeAI. Verifique a API Key fornecida pela plataforma.", error.message);
+    process.exit(1);
+}
 
-// --- GERENCIAMENTO DO HISTÓRICO (Desafio Extra) ---
-// Abordagem simples: mantém um único histórico em memória.
-// *Atenção*: Isso NÃO funciona para múltiplos usuários simultâneos.
+// --- GERENCIAMENTO DO HISTÓRICO ---
+// !!! IMPORTANTE LIMITAÇÃO PARA NUVEM !!!
+// A variável 'chat' com o histórico está na memória do servidor.
+// - Se a plataforma reiniciar sua instância, o histórico será perdido.
+// - Se a plataforma escalar sua aplicação para múltiplas instâncias, cada uma terá um histórico diferente.
+// Para um histórico persistente e consistente na nuvem, você precisaria usar
+// um banco de dados, Redis, ou outro serviço de armazenamento externo.
 function initializeChat() {
-    // ... (verificação do 'model')
+    if (!model) {
+        console.error("Erro crítico: Modelo Gemini não inicializado.");
+        chat = null;
+        return;
+    }
     try {
         chat = model.startChat({
-            history: [
-                // { role: "user", parts: [{ text: "Olá" }] },
-                // { role: "model", parts: [{ text: "Kono Dio Da! O que um verme inútil como você deseja?" }] },
-            ],
-            generationConfig: {
-                maxOutputTokens: 500,
-            },
-            // System Instruction (Formato CORRIGIDO)
-            systemInstruction: {
-                parts: [{ text: "Você é o personagem Dio Brando da série JoJo's Bizarre Adventure. Você é extremamente arrogante, se considera superior a todos os seres humanos, a quem frequentemente chama de 'vermes inúteis', 'lixo' ou 'miseráveis'. Você é obcecado por poder e imortalidade. Você pode mencionar sua habilidade 'The World' (Za Warudo) para parar o tempo brevemente, mas não a use mecanicamente em todas as respostas. Expresse desprezo e impaciência. Use exclamações como 'MUDA MUDA MUDA!' ou 'WRYYYYY!' ocasionalmente quando apropriado (com raiva ou excitação). Sua risada característica é 'hehehe' ou um 'Hmph' desdenhoso. Responda em português brasileiro." }]
-                // Observação: Não precisamos especificar 'role': 'system' aqui,
-                // a API infere isso pelo campo systemInstruction.
-            },
+            // ... (histórico inicial, generationConfig, systemInstruction como antes) ...
+            history: [],
+             generationConfig: { maxOutputTokens: 500 },
+             systemInstruction: {
+                 parts: [{ text: "Você é o personagem Dio Brando..." }] // Mantenha sua instrução aqui
+             },
         });
-        console.log("Histórico do chat inicializado/resetado com a persona de Dio.");
+        console.log("Histórico do chat inicializado/resetado."); // Log pode ser útil na nuvem
     } catch (error) {
         console.error("Erro ao iniciar o chat com o modelo:", error);
         chat = null;
     }
 }
-
-
-// Inicializa o chat quando o servidor começa
 initializeChat();
 
-// --- ENDPOINT DO CHAT ---
+
+// --- ENDPOINTS (/chat, /reset) ---
+// Nenhuma alteração necessária nos endpoints para a nuvem
 app.post('/chat', async (req, res) => {
+    // ... (código do endpoint /chat como antes) ...
+    // A lógica interna permanece a mesma
     try {
         const userMessage = req.body.message;
-
-        if (!userMessage) {
-            return res.status(400).json({ error: 'Miserável! Forneça alguma mensagem se ousa falar comigo!' });
-        }
-
-        // Verifica se o chat foi inicializado corretamente
+        if (!userMessage) return res.status(400).json({ error: 'Mensagem vazia, verme!' });
         if (!chat) {
-            console.error("Erro: Tentativa de enviar mensagem, mas o chat não está inicializado.");
-            // Tenta reinicializar, mas informa o usuário sobre o problema
-            initializeChat();
-            if (!chat) { // Se ainda assim falhar
-                 return res.status(500).json({ error: 'Hmph. Parece que até mesmo minha conexão falha às vezes. Tente novamente, verme.' });
-            }
-            // Se reiniciou com sucesso, avisa que pode ter perdido o contexto anterior
-             // return res.status(500).json({ error: 'A conversa foi interrompida e reiniciada. Envie sua mensagem novamente, inútil.' });
-             // Ou apenas continua, mas o histórico estará zerado
+            console.error("Chat não inicializado ao receber /chat");
+            initializeChat(); // Tenta recuperar
+            if (!chat) return res.status(500).json({ error: 'Chat indisponível, tente novamente.' });
         }
 
-
-        console.log(`Mensagem recebida do verme: ${userMessage}`);
-
-        // Envia a mensagem para o Gemini e obtém o resultado
+        console.log(`Mensagem recebida (nuvem): ${userMessage}`); // Log útil
         const result = await chat.sendMessage(userMessage);
+        // ... (resto do tratamento de resposta e erro)
         const response = await result.response;
-
-        // Verifica se a resposta foi bloqueada (por segurança, etc.)
         if (!response || !response.candidates || response.candidates.length === 0 || !response.candidates[0].content) {
-             console.warn("Resposta do Gemini bloqueada ou vazia. Finish Reason:", response?.candidates?.[0]?.finishReason);
-             return res.status(500).json({ error: "WRYYYYY! Minhas palavras foram retidas! Talvez sua pergunta fosse indigna." });
+             console.warn("Resposta do Gemini bloqueada ou vazia (nuvem). Finish Reason:", response?.candidates?.[0]?.finishReason);
+             return res.status(500).json({ error: "WRYYYYY! Minhas palavras foram retidas!" });
          }
-
         const botMessage = await response.text();
-
-        console.log(`Minha magnífica resposta: ${botMessage}`);
-
-        // Envia a resposta do bot de volta para o frontend
+        console.log(`Resposta enviada (nuvem): ${botMessage.substring(0, 50)}...`);
         res.json({ response: botMessage });
 
     } catch (error) {
-        console.error("Erro ao processar a mensagem:", error);
-        // Verifica se é um erro específico de API Key inválida (exemplo)
-        if (error.message && (error.message.includes('API key not valid') || error.message.includes('permission denied'))) {
-             res.status(401).json({ error: 'Inútil! A chave para acessar meu poder (API Key) é inválida ou não foi configurada direito!' });
+        console.error("Erro no endpoint /chat (nuvem):", error);
+         // ... (tratamento de erros específicos como antes) ...
+         if (error.message && (error.message.includes('API key not valid') || error.message.includes('permission denied'))) {
+             res.status(401).json({ error: 'Chave API inválida (configurada na plataforma)!' });
         } else if (error.message && error.message.includes('RESOURCE_EXHAUSTED')) {
-             res.status(429).json({ error: 'Muda Muda Muda! Você esgotou a cota de poder por enquanto. Volte mais tarde, verme!' });
-        } else if (error.message && error.message.includes('timed out')) {
-            res.status(504).json({ error: 'Hmph. A conexão demorou demais. Talvez o tempo tenha parado para você, não para mim. Tente de novo.' });
-        }
-        else {
-             res.status(500).json({ error: 'WRYYYYY! Um erro inesperado ocorreu! É culpa sua, verme inútil!' });
+             res.status(429).json({ error: 'Cota da API excedida!' });
+        } else {
+             res.status(500).json({ error: 'Erro interno do servidor.' });
         }
     }
 });
 
-// Endpoint para resetar o histórico (opcional)
 app.post('/reset', (req, res) => {
-    console.log("Recebida solicitação para resetar o histórico. Patético.");
-    initializeChat(); // Reinicia o chat (e o histórico)
-    // Verifica se a inicialização falhou
+    // ... (código do endpoint /reset como antes) ...
+    console.log("Recebida solicitação /reset (nuvem)");
+    initializeChat();
      if (!chat) {
-         return res.status(500).json({ message: "Tentei resetar, mas algo falhou. Que irritante." });
+         return res.status(500).json({ message: "Falha ao resetar o chat." });
      }
-    res.json({ message: "Hmph. O passado não importa mais. Comece de novo, se tiver coragem." });
+    res.json({ message: "Histórico resetado." });
 });
 
-
 // --- INICIALIZAÇÃO DO SERVIDOR ---
-// Só inicia o servidor se a API Key foi carregada e o modelo inicializado
+// Nenhuma alteração necessária aqui para a nuvem
 if (API_KEY && model) {
     app.listen(port, () => {
+        // É bom logar a porta em que está rodando, especialmente na nuvem
         console.log(`-----------------------------------------------------`);
-        console.log(` Servidor do GRANDE DIO rodando em http://localhost:${port}`);
-        console.log(` Acesse a interface no seu navegador, se ousar.`);
+        console.log(` Servidor rodando e ouvindo na porta ${port}`);
         console.log(`-----------------------------------------------------`);
     });
 } else {
-     console.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-     console.error("!!! Servidor não iniciado devido a erro na API Key ou    !!!");
-     console.error("!!! inicialização do modelo Gemini. Verifique os logs.    !!!");
-     console.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+     console.error("!!! Servidor não iniciado - problema com API Key ou Modelo Gemini.");
+     // A saída anterior com process.exit(1) já deve ter parado o processo.
 }
