@@ -1,7 +1,6 @@
 // Importa as dependências necessárias
 const express = require('express');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-require('dotenv').config(); // Carrega as variáveis do arquivo .env para process.env
 
 // Configuração do Express
 const app = express(); // Inicializa o aplicativo Express
@@ -13,20 +12,8 @@ app.use(express.json());
 app.use(express.static('public'));
 
 // --- CONFIGURAÇÃO DO GEMINI ---
-// !! IMPORTANTE: Certifique-se de que a chave no seu arquivo .env é GEMINI_API_KEY !!
-const API_KEY = process.env.GEMINI_API_KEY; // Lê a chave do ambiente
-
-if (!API_KEY) {
-    console.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-    console.error("!!! Atenção: GEMINI_API_KEY não encontrada no .env ou ambiente.");
-    console.error("!!! Crie um arquivo .env na raiz do projeto com:         !!!");
-    console.error("!!! GEMINI_API_KEY=SUA_CHAVE_DE_API_AQUI                  !!!");
-    console.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-    // Em um cenário real, você pode querer impedir o servidor de iniciar:
-    // process.exit(1);
-} else {
-    console.log("Chave da API do Gemini carregada com sucesso via .env.");
-}
+// !! IMPORTANTE: Certifique-se de que a chave no seu arquivo .env é AIzaSyAEEUL3k6lMgEJ9atccO1hQ8lHIZKuBnJ8 !!
+const API_KEY = AIzaSyAEEUL3k6lMgEJ9atccO1hQ8lHIZKuBnJ8; // Lê a chave do ambiente
 
 // Inicializa o cliente do Google Generative AI (SOMENTE se a API_KEY foi carregada)
 let genAI, model, chat;
