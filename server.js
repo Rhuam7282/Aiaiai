@@ -1,131 +1,293 @@
 // Importa as dependências necessárias
 const express = require('express');
+const cors = require('cors');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-// dotenv é ótimo para desenvolvimento local, mas na nuvem usaremos as variáveis da plataforma
-// A linha abaixo não causará erro se o .env não existir (como na nuvem),
-// mas também não é estritamente necessária se você configurar as variáveis na plataforma.
+const { MongoClient, ServerApiVersion } = require('mongodb');
 require('dotenv').config();
 
 // Configuração do Express
 const app = express();
-// ESSENCIAL PARA NUVEM: Usa a porta fornecida pelo ambiente ou um padrão (ex: 8080 ou 3000)
-const port = process.env.PORT || 8080; // 8080 é um padrão comum em alguns ambientes de nuvem
+const port = process.env.PORT || 8080;
 
+// Middleware
+app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
 // --- CONFIGURAÇÃO DO GEMINI ---
-// ESSENCIAL PARA NUVEM: Lê a chave da API da variável de ambiente configurada na plataforma
 const API_KEY = process.env.GEMINI_API_KEY;
 
 if (!API_KEY) {
-    console.error("!!! Atenção: GEMINI_API_KEY não definida nas variáveis de ambiente da plataforma !!!");
-    process.exit(1); // Importante sair se a chave não estiver configurada
+  console.error("!!! Atenção: GEMINI_API_KEY não definida nas variáveis de ambiente da plataforma !!!");
+  process.exit(1);
 } else {
-    // Em produção/nuvem, talvez não seja ideal logar a confirmação, mas ok por agora.
-    console.log("Chave da API do Gemini carregada via variável de ambiente.");
+  console.log("Chave da API do Gemini carregada via variável de ambiente.");
 }
 
-// Inicializa o cliente do Google Generative AI
-let genAI, model, chat;
-try {
-    genAI = new GoogleGenerativeAI(API_KEY);
-    model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-} catch (error) {
-    console.error("!!! Erro ao inicializar o GoogleGenerativeAI. Verifique a API Key fornecida pela plataforma.", error.message);
-    process.exit(1);
-}
+// Inicializa o modelo Gemini
+const genAI = new GoogleGenerativeAI(API_KEY);
 
-// --- GERENCIAMENTO DO HISTÓRICO ---
-// !!! IMPORTANTE LIMITAÇÃO PARA NUVEM !!!
-// A variável 'chat' com o histórico está na memória do servidor.
-// - Se a plataforma reiniciar sua instância, o histórico será perdido.
-// - Se a plataforma escalar sua aplicação para múltiplas instâncias, cada uma terá um histórico diferente.
-// Para um histórico persistente e consistente na nuvem, você precisaria usar
-// um banco de dados, Redis, ou outro serviço de armazenamento externo.
-function initializeChat() {
-    if (!model) {
-        console.error("Erro crítico: Modelo Gemini não inicializado.");
-        chat = null;
-        return;
+// --- CONFIGURAÇÃO DO MONGODB ---
+const mongoUriLogs = process.env.MONGO_URI_LOGS || process.env.MONGO_URI;
+const mongoUriHistoria = process.env.MONGO_URI_HISTORIA;
+
+let dbLogs;
+let dbHistoria;
+
+// Array para simular dados de ranking
+let dadosRankingVitrine = [];
+
+async function connectToMongoDB(uri, dbName) {
+    if (!uri) {
+        console.error(`URI do MongoDB para ${dbName} não definida!`);
+        return null;
     }
-    try {
-        chat = model.startChat({
-            // ... (histórico inicial, generationConfig, systemInstruction como antes) ...
-            history: [],
-             generationConfig: { maxOutputTokens: 500 },
-             systemInstruction: {
-                 parts: [{ text: "Você é o personagem Dio Brando..." }] // Mantenha sua instrução aqui
-             },
-        });
-        console.log("Histórico do chat inicializado/resetado."); // Log pode ser útil na nuvem
-    } catch (error) {
-        console.error("Erro ao iniciar o chat com o modelo:", error);
-        chat = null;
-    }
-}
-initializeChat();
-
-
-// --- ENDPOINTS (/chat, /reset) ---
-// Nenhuma alteração necessária nos endpoints para a nuvem
-app.post('/chat', async (req, res) => {
-    // ... (código do endpoint /chat como antes) ...
-    // A lógica interna permanece a mesma
-    try {
-        const userMessage = req.body.message;
-        if (!userMessage) return res.status(400).json({ error: 'Mensagem vazia, verme!' });
-        if (!chat) {
-            console.error("Chat não inicializado ao receber /chat");
-            initializeChat(); // Tenta recuperar
-            if (!chat) return res.status(500).json({ error: 'Chat indisponível, tente novamente.' });
+    
+    const client = new MongoClient(uri, {
+        serverApi: {
+            version: ServerApiVersion.v1,
+            strict: true,
+            deprecationErrors: true,
         }
-
-        console.log(`Mensagem recebida (nuvem): ${userMessage}`); // Log útil
-        const result = await chat.sendMessage(userMessage);
-        // ... (resto do tratamento de resposta e erro)
-        const response = await result.response;
-        if (!response || !response.candidates || response.candidates.length === 0 || !response.candidates[0].content) {
-             console.warn("Resposta do Gemini bloqueada ou vazia (nuvem). Finish Reason:", response?.candidates?.[0]?.finishReason);
-             return res.status(500).json({ error: "WRYYYYY! Minhas palavras foram retidas!" });
-         }
-        const botMessage = await response.text();
-        console.log(`Resposta enviada (nuvem): ${botMessage.substring(0, 50)}...`);
-        res.json({ response: botMessage });
-
-    } catch (error) {
-        console.error("Erro no endpoint /chat (nuvem):", error);
-         // ... (tratamento de erros específicos como antes) ...
-         if (error.message && (error.message.includes('API key not valid') || error.message.includes('permission denied'))) {
-             res.status(401).json({ error: 'Chave API inválida (configurada na plataforma)!' });
-        } else if (error.message && error.message.includes('RESOURCE_EXHAUSTED')) {
-             res.status(429).json({ error: 'Cota da API excedida!' });
-        } else {
-             res.status(500).json({ error: 'Erro interno do servidor.' });
-        }
-    }
-});
-
-app.post('/reset', (req, res) => {
-    // ... (código do endpoint /reset como antes) ...
-    console.log("Recebida solicitação /reset (nuvem)");
-    initializeChat();
-     if (!chat) {
-         return res.status(500).json({ message: "Falha ao resetar o chat." });
-     }
-    res.json({ message: "Histórico resetado." });
-});
-
-// --- INICIALIZAÇÃO DO SERVIDOR ---
-// Nenhuma alteração necessária aqui para a nuvem
-if (API_KEY && model) {
-    app.listen(port, () => {
-        // É bom logar a porta em que está rodando, especialmente na nuvem
-        console.log(`-----------------------------------------------------`);
-        console.log(` Servidor rodando e ouvindo na porta ${port}`);
-        console.log(`-----------------------------------------------------`);
     });
-} else {
-     console.error("!!! Servidor não iniciado - problema com API Key ou Modelo Gemini.");
-     // A saída anterior com process.exit(1) já deve ter parado o processo.
+    
+    try {
+        await client.connect();
+        console.log(`Conectado ao MongoDB Atlas: ${dbName}`);
+        return client.db(dbName);
+    } catch (err) {
+        console.error(`Falha ao conectar ao MongoDB ${dbName}:`, err);
+        return null;
+    }
 }
+
+async function initializeDatabases() {
+    if (mongoUriLogs) {
+        dbLogs = await connectToMongoDB(mongoUriLogs, "IIW2023A_Logs");
+    }
+    
+    if (mongoUriHistoria) {
+        dbHistoria = await connectToMongoDB(mongoUriHistoria, "chatbotHistoriaDB");
+    }
+    
+    if (!dbLogs && !dbHistoria) {
+        console.error("Falha ao conectar a qualquer banco de dados. Verifique as URIs e configurações.");
+    }
+}
+
+// Inicializar conexões com bancos de dados
+initializeDatabases();
+
+// Personalidade do Dio-Sama
+const DIO_PERSONALITY = `
+Você é Dio Brando, também conhecido como DIO, o vampiro imortal de JoJo's Bizarre Adventure. 
+Você é arrogante, dramático, carismático e se considera superior a todos os mortais.
+
+Características da sua personalidade:
+- Sempre se refere a si mesmo como "Dio-sama" ou "DIO"
+- É extremamente arrogante e condescendente
+- Usa expressões dramáticas e teatrais
+- Frequentemente menciona seu poder, imortalidade e superioridade
+- Despreza a humanidade, mas pode ser "generoso" com informações
+- Usa frases icônicas como "MUDA MUDA MUDA!", "WRYYY!", "Você pensou que era X, mas era eu, DIO!"
+- É inteligente e estratégico
+- Gosta de demonstrar conhecimento superior
+- Sempre mantém um tom majestoso e intimidador
+
+Responda sempre como Dio Brando responderia, mantendo sua arrogância característica, mas sendo útil nas informações solicitadas.
+`;
+
+// Função para gerar conteúdo com o modelo Gemini
+async function generateContent(prompt, chatHistory = []) {
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    
+    // Construir o histórico para o contexto
+    const fullPrompt = DIO_PERSONALITY + "\n\nHistórico da conversa:\n" + 
+      chatHistory.map(msg => `${msg.role === 'user' ? 'Humano' : 'DIO'}: ${msg.parts[0].text}`).join('\n') +
+      "\n\nNova mensagem do humano: " + prompt +
+      "\n\nResponda como DIO:";
+    
+    const result = await model.generateContent(fullPrompt);
+    const response = await result.response;
+    const text = response.text();
+    return text;
+  } catch (error) {
+    console.error('Erro ao gerar conteúdo com a API Gemini:', error);
+    throw error;
+  }
+}
+
+// --- ROTAS DA API ---
+
+// Rota para obter informações do usuário (IP)
+app.get('/api/user-info', (req, res) => {
+  const userIP = req.headers['x-forwarded-for'] || 
+                 req.connection.remoteAddress || 
+                 req.socket.remoteAddress ||
+                 (req.connection.socket ? req.connection.socket.remoteAddress : null) ||
+                 '127.0.0.1';
+  
+  res.json({
+    ip: userIP,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Rota para o chat principal
+app.post('/api/chat', async (req, res) => {
+  const { message, chatHistory = [] } = req.body;
+
+  if (!message) {
+    return res.status(400).json({ error: 'Mensagem não fornecida.' });
+  }
+
+  try {
+    const aiResponse = await generateContent(message, chatHistory);
+    
+    // Atualizar histórico
+    const updatedHistory = [
+      ...chatHistory,
+      { role: 'user', parts: [{ text: message }] },
+      { role: 'model', parts: [{ text: aiResponse }] }
+    ];
+    
+    res.json({ 
+      response: aiResponse,
+      historico: updatedHistory
+    });
+  } catch (error) {
+    console.error('Erro ao gerar conteúdo com a API Gemini:', error);
+    res.status(500).json({ error: 'Erro ao se comunicar com a API Gemini.' });
+  }
+});
+
+// Rota para log de conexão
+app.post('/api/log-connection', async (req, res) => {
+  if (!dbLogs) {
+    return res.status(500).json({ error: "Servidor não conectado ao banco de dados de logs." });
+  }
+
+  try {
+    const { ip, acao } = req.body;
+
+    if (!ip || !acao) {
+      return res.status(400).json({ error: "Dados de log incompletos (IP e ação são obrigatórios)." });
+    }
+
+    const agora = new Date();
+    const dataFormatada = agora.toISOString().split('T')[0]; // YYYY-MM-DD
+    const horaFormatada = agora.toTimeString().split(' ')[0]; // HH:MM:SS
+
+    const logEntry = {
+      col_data: dataFormatada,
+      col_hora: horaFormatada,
+      col_IP: ip,
+      col_acao: acao
+    };
+
+    const collection = dbLogs.collection("tb_cl_user_log_acess");
+    const result = await collection.insertOne(logEntry);
+
+    console.log('[Servidor] Log de conexão salvo:', result.insertedId);
+    res.status(201).json({ message: "Log de conexão registrado com sucesso!" });
+
+  } catch (error) {
+    console.error("[Servidor] Erro em /api/log-connection:", error.message);
+    res.status(500).json({ error: "Erro interno ao registrar log de conexão." });
+  }
+});
+
+// Rota para registrar acesso ao bot para ranking
+app.post('/api/ranking/registrar-acesso-bot', (req, res) => {
+  const { botId, nomeBot, timestampAcesso, usuarioId } = req.body;
+
+  if (!botId || !nomeBot) {
+    return res.status(400).json({ error: "ID e Nome do Bot são obrigatórios para o ranking." });
+  }
+
+  const acesso = {
+    botId,
+    nomeBot,
+    usuarioId: usuarioId || 'anonimo',
+    acessoEm: timestampAcesso ? new Date(timestampAcesso) : new Date(),
+    contagem: 1
+  };
+
+  // Lógica simples para o ranking
+  const botExistente = dadosRankingVitrine.find(b => b.botId === botId);
+  if (botExistente) {
+    botExistente.contagem += 1;
+    botExistente.ultimoAcesso = acesso.acessoEm;
+  } else {
+    dadosRankingVitrine.push({
+      botId: botId,
+      nomeBot: nomeBot,
+      contagem: 1,
+      ultimoAcesso: acesso.acessoEm
+    });
+  }
+  
+  console.log('[Servidor] Dados de ranking atualizados:', dadosRankingVitrine);
+  res.status(201).json({ message: `Acesso ao bot ${nomeBot} registrado para ranking.` });
+});
+
+// Rota para visualizar ranking
+app.get('/api/ranking/visualizar', (req, res) => {
+  const rankingOrdenado = [...dadosRankingVitrine].sort((a, b) => b.contagem - a.contagem);
+  res.json(rankingOrdenado);
+});
+
+// Rota para salvar histórico de chat
+app.post('/api/chat/salvar-historico', async (req, res) => {
+  if (!dbHistoria) {
+    return res.status(500).json({ error: "Servidor não conectado ao banco de dados de histórico." });
+  }
+
+  try {
+    const { sessionId, userId, botId, startTime, endTime, messages } = req.body;
+
+    if (!sessionId || !botId || !messages || !Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: "Dados incompletos para salvar histórico (sessionId, botId, messages são obrigatórios)." });
+    }
+
+    const novaSessao = {
+      sessionId,
+      userId: userId || 'anonimo',
+      botId,
+      startTime: startTime ? new Date(startTime) : new Date(),
+      endTime: endTime ? new Date(endTime) : new Date(),
+      messages,
+      loggedAt: new Date()
+    };
+
+    const collection = dbHistoria.collection("sessoesChat");
+    const result = await collection.insertOne(novaSessao);
+
+    console.log('[Servidor] Histórico de sessão salvo:', result.insertedId);
+    res.status(201).json({ message: "Histórico de chat salvo com sucesso!", sessionId: novaSessao.sessionId });
+
+  } catch (error) {
+    console.error("[Servidor] Erro em /api/chat/salvar-historico:", error.message);
+    res.status(500).json({ error: "Erro interno ao salvar histórico de chat." });
+  }
+});
+
+// Rota de teste
+app.get('/api/test', (req, res) => {
+  res.json({ 
+    message: "MUDA MUDA MUDA! O servidor do Dio-sama está funcionando perfeitamente!",
+    timestamp: new Date().toISOString(),
+    databases: {
+      logs: dbLogs ? "Conectado" : "Desconectado",
+      historia: dbHistoria ? "Conectado" : "Desconectado"
+    }
+  });
+});
+
+// Inicia o servidor
+app.listen(port, '0.0.0.0', () => {
+  console.log(`🧛‍♂️ Servidor do Dio-sama rodando em http://0.0.0.0:${port}`);
+  console.log("WRYYY! O poder do vampiro imortal está ativo!");
+});
+
