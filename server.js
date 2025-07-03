@@ -109,7 +109,7 @@ async function generateContent(prompt, chatHistory = []) {
     
     // Construir o histórico para o contexto
     const fullPrompt = DIO_PERSONALITY + "\n\nHistórico da conversa:\n" + 
-      chatHistory.map(msg => `${msg.role === \"user\" ? \"Humano\" : \"DIO\"}: ${msg.parts[0].text}`).join("\n") +
+      chatHistory.map(msg => `${msg.role === "user" ? "Humano" : "DIO"}: ${msg.parts[0].text}`).join("\n") +
       "\n\nNova mensagem do humano: " + prompt +
       "\n\nResponda como DIO:";
     
@@ -127,11 +127,11 @@ async function generateContent(prompt, chatHistory = []) {
 
 // Rota para obter informações do usuário (IP)
 app.get("/api/user-info", (req, res) => {
-  const userIP = req.headers[\"x-forwarded-for\"] || 
+  const userIP = req.headers["x-forwarded-for"] || 
                  req.connection.remoteAddress || 
                  req.socket.remoteAddress ||
                  (req.connection.socket ? req.connection.socket.remoteAddress : null) ||
-                 \"127.0.0.1\";
+                 "127.0.0.1";
   
   res.json({
     ip: userIP,
@@ -144,7 +144,7 @@ app.post("/api/chat", async (req, res) => {
   const { message, chatHistory = [] } = req.body;
 
   if (!message) {
-    return res.status(400).json({ error: \"Mensagem não fornecida.\" });
+    return res.status(400).json({ error: "Mensagem não fornecida." });
   }
 
   try {
@@ -153,8 +153,8 @@ app.post("/api/chat", async (req, res) => {
     // Atualizar histórico
     const updatedHistory = [
       ...chatHistory,
-      { role: \"user\", parts: [{ text: message }] },
-      { role: \"model\", parts: [{ text: aiResponse }] }
+      { role: "user", parts: [{ text: message }] },
+      { role: "model", parts: [{ text: aiResponse }] }
     ];
     
     res.json({ 
@@ -163,7 +163,7 @@ app.post("/api/chat", async (req, res) => {
     });
   } catch (error) {
     console.error("Erro ao gerar conteúdo com a API Gemini:", error);
-    res.status(500).json({ error: \"Erro ao se comunicar com a API Gemini.\" });
+    res.status(500).json({ error: "Erro ao se comunicar com a API Gemini." });
   }
 });
 
@@ -177,12 +177,12 @@ app.post("/api/log-connection", async (req, res) => {
     const { ip, acao } = req.body;
 
     if (!ip || !acao) {
-      return res.status(400).json({ error: \"Dados de log incompletos (IP e ação são obrigatórios).\" });
+      return res.status(400).json({ error: "Dados de log incompletos (IP e ação são obrigatórios)." });
     }
 
     const agora = new Date();
-    const dataFormatada = agora.toISOString().split(\"T\")[0]; // YYYY-MM-DD
-    const horaFormatada = agora.toTimeString().split(\" \")[0]; // HH:MM:SS
+    const dataFormatada = agora.toISOString().split("T")[0]; // YYYY-MM-DD
+    const horaFormatada = agora.toTimeString().split(" ")[0]; // HH:MM:SS
 
     const logEntry = {
       col_data: dataFormatada,
@@ -194,12 +194,12 @@ app.post("/api/log-connection", async (req, res) => {
     const collection = dbLogs.collection("tb_cl_user_log_acess");
     const result = await collection.insertOne(logEntry);
 
-    console.log(\"[Servidor] Log de conexão salvo:\", result.insertedId);
+    console.log("[Servidor] Log de conexão salvo:", result.insertedId);
     res.status(201).json({ message: "Log de conexão registrado com sucesso!" });
 
   } catch (error) {
-    console.error(\"[Servidor] Erro em /api/log-connection:\", error.message);
-    res.status(500).json({ error: \"Erro interno ao registrar log de conexão.\" });
+    console.error("[Servidor] Erro em /api/log-connection:", error.message);
+    res.status(500).json({ error: "Erro interno ao registrar log de conexão." });
   }
 });
 
@@ -208,13 +208,13 @@ app.post("/api/ranking/registrar-acesso-bot", (req, res) => {
   const { botId, nomeBot, timestampAcesso, usuarioId } = req.body;
 
   if (!botId || !nomeBot) {
-    return res.status(400).json({ error: \"ID e Nome do Bot são obrigatórios para o ranking.\" });
+    return res.status(400).json({ error: "ID e Nome do Bot são obrigatórios para o ranking." });
   }
 
   const acesso = {
     botId,
     nomeBot,
-    usuarioId: usuarioId || \"anonimo\",
+    usuarioId: usuarioId || "anonimo",
     acessoEm: timestampAcesso ? new Date(timestampAcesso) : new Date(),
     contagem: 1
   };
@@ -233,7 +233,7 @@ app.post("/api/ranking/registrar-acesso-bot", (req, res) => {
     });
   }
   
-  console.log(\"[Servidor] Dados de ranking atualizados:\", dadosRankingVitrine);
+  console.log("[Servidor] Dados de ranking atualizados:", dadosRankingVitrine);
   res.status(201).json({ message: `Acesso ao bot ${nomeBot} registrado para ranking.` });
 });
 
@@ -253,12 +253,12 @@ app.post("/api/chat/salvar-historico", async (req, res) => {
     const { sessionId, userId, botId, startTime, endTime, messages } = req.body;
 
     if (!sessionId || !botId || !messages || !Array.isArray(messages) || messages.length === 0) {
-      return res.status(400).json({ error: \"Dados incompletos para salvar histórico (sessionId, botId, messages são obrigatórios).\" });
+      return res.status(400).json({ error: "Dados incompletos para salvar histórico (sessionId, botId, messages são obrigatórios)." });
     }
 
     const novaSessao = {
       sessionId,
-      userId: userId || \"anonimo\",
+      userId: userId || "anonimo",
       botId,
       startTime: startTime ? new Date(startTime) : new Date(),
       endTime: endTime ? new Date(endTime) : new Date(),
@@ -269,12 +269,12 @@ app.post("/api/chat/salvar-historico", async (req, res) => {
     const collection = dbHistoria.collection("sessoesChat");
     const result = await collection.insertOne(novaSessao);
 
-    console.log(\"[Servidor] Histórico de sessão salvo:\", result.insertedId);
+    console.log("[Servidor] Histórico de sessão salvo:", result.insertedId);
     res.status(201).json({ message: "Histórico de chat salvo com sucesso!", sessionId: novaSessao.sessionId });
 
   } catch (error) {
-    console.error(\"[Servidor] Erro em /api/chat/salvar-historico:\", error.message);
-    res.status(500).json({ error: \"Erro interno ao salvar histórico de chat.\" });
+    console.error("[Servidor] Erro em /api/chat/salvar-historico:", error.message);
+    res.status(500).json({ error: "Erro interno ao salvar histórico de chat." });
   }
 });
 
@@ -291,7 +291,7 @@ app.get("/api/test", (req, res) => {
 });
 
 // Inicia o servidor
-app.listen(port, \"0.0.0.0\", () => {
+app.listen(port, "0.0.0.0", () => {
   console.log(`🧛‍♂️ Servidor do Dio-sama rodando em http://0.0.0.0:${port}`);
   console.log("WRYYY! O poder do vampiro imortal está ativo!");
 });
