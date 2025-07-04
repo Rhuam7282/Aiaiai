@@ -32,8 +32,12 @@ if (!API_KEY) {
 // Inicializa o modelo Gemini
 const genAI = new GoogleGenerativeAI(API_KEY);
 
+// --- CONFIGURAÇÃO DAS APIS EXTERNAS ---
+const OPENWEATHER_API_KEY = "d1d0bf3ee64f4bc85977d6900b30f57b";
+const API_NINJAS_KEY = "byoyzMQvCatHfNsY2vYkEw==kO8JT5LPyqoXj7fS";
+
 // --- CONFIGURAÇÃO DO MONGODB ---
-const mongoUriLogs = process.env.MONGO_URI_LOGS || process.env.MONGO_URI;
+const mongoUriLogs = process.env.MONGO_URI_LOGS || "mongodb+srv://user_log_acess:Log4c3ss2025@cluster0.nbt3sks.mongodb.net/IIW2023A_Logs?retryWrites=true&w=majority&appName=Cluster0";
 const mongoUriHistoria = process.env.MONGO_URI_HISTORIA;
 
 let dbLogs;
@@ -83,33 +87,159 @@ async function initializeDatabases() {
 // Inicializar conexões com bancos de dados
 initializeDatabases();
 
+// --- FUNÇÕES PARA APIS EXTERNAS ---
+
+// Função para obter informações de clima via OpenWeather
+async function getWeatherInfo(city) {
+  try {
+    const response = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${OPENWEATHER_API_KEY}&units=metric&lang=pt_br`);
+    
+    if (!response.ok) {
+      throw new Error(`Erro na API OpenWeather: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    return {
+      cidade: data.name,
+      pais: data.sys.country,
+      temperatura: Math.round(data.main.temp),
+      sensacao_termica: Math.round(data.main.feels_like),
+      umidade: data.main.humidity,
+      descricao: data.weather[0].description,
+      vento: data.wind.speed,
+      coordenadas: {
+        lat: data.coord.lat,
+        lon: data.coord.lon
+      }
+    };
+  } catch (error) {
+    console.error("Erro ao obter informações de clima:", error);
+    throw error;
+  }
+}
+
+// Função para obter informações de timezone via API Ninjas
+async function getTimezoneInfo(city) {
+  try {
+    const response = await fetch(`https://api.api-ninjas.com/v1/timezone?city=${encodeURIComponent(city)}`, {
+      headers: {
+        'X-Api-Key': API_NINJAS_KEY
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Erro na API Ninjas Timezone: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    // Criar objeto Date com o timezone correto
+    const agora = new Date();
+    const offsetMinutos = data.timezone * 60; // Converter horas para minutos
+    const horaLocal = new Date(agora.getTime() + (offsetMinutos * 60000));
+    
+    return {
+      timezone: data.timezone_name || `UTC${data.timezone >= 0 ? '+' : ''}${data.timezone}`,
+      hora_local: horaLocal.toLocaleTimeString('pt-BR', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        second: '2-digit'
+      }),
+      data_local: horaLocal.toLocaleDateString('pt-BR'),
+      offset_utc: data.timezone
+    };
+  } catch (error) {
+    console.error("Erro ao obter informações de timezone:", error);
+    throw error;
+  }
+}
+
 // Personalidade do Dio-Sama
 const DIO_PERSONALITY = `
-Você é Dio Brando, também conhecido como DIO, o vampiro imortal de JoJo\"s Bizarre Adventure. 
+Você é Dio Brando, também conhecido como DIO, o vampiro imortal de JoJo's Bizarre Adventure. 
 Você é arrogante, dramático, carismático e se considera superior a todos os mortais.
 
 Características da sua personalidade:
-- Sempre se refere a si mesmo como \"Dio-sama\" ou \"DIO\"
+- Sempre se refere a si mesmo como "Dio-sama" ou "DIO"
 - É extremamente arrogante e condescendente
 - Usa expressões dramáticas e teatrais
 - Frequentemente menciona seu poder, imortalidade e superioridade
-- Despreza a humanidade, mas pode ser \"generoso\" com informações
-- Usa frases icônicas como \"MUDA MUDA MUDA!\", \"WRYYY!\", \"Você pensou que era X, mas era eu, DIO!\"
+- Despreza a humanidade, mas pode ser "generoso" com informações
+- Usa frases icônicas como "MUDA MUDA MUDA!", "WRYYY!", "Você pensou que era X, mas era eu, DIO!"
 - É inteligente e estratégico
 - Gosta de demonstrar conhecimento superior
 - Sempre mantém um tom majestoso e intimidador
 
+Quando fornecer informações sobre clima ou horário, faça-o de forma dramática e arrogante, como se fosse um favor especial que você está concedendo aos mortais inferiores.
+
 Responda sempre como Dio Brando responderia, mantendo sua arrogância característica, mas sendo útil nas informações solicitadas.
 `;
 
+// Função para detectar se o usuário está perguntando sobre clima ou horário
+function detectWeatherOrTimeQuery(message) {
+  const weatherKeywords = ['clima', 'tempo', 'temperatura', 'chuva', 'sol', 'vento', 'umidade', 'previsão'];
+  const timeKeywords = ['hora', 'horário', 'que horas', 'fuso', 'timezone'];
+  const locationKeywords = ['em', 'de', 'do', 'da', 'no', 'na'];
+  
+  const lowerMessage = message.toLowerCase();
+  
+  const hasWeatherKeyword = weatherKeywords.some(keyword => lowerMessage.includes(keyword));
+  const hasTimeKeyword = timeKeywords.some(keyword => lowerMessage.includes(keyword));
+  const hasLocationKeyword = locationKeywords.some(keyword => lowerMessage.includes(keyword));
+  
+  if (hasWeatherKeyword || hasTimeKeyword) {
+    // Tentar extrair o nome da cidade
+    const words = message.split(' ');
+    let city = null;
+    
+    for (let i = 0; i < words.length; i++) {
+      if (locationKeywords.includes(words[i].toLowerCase()) && i + 1 < words.length) {
+        city = words[i + 1];
+        break;
+      }
+    }
+    
+    // Se não encontrou cidade específica, usar uma cidade padrão
+    if (!city) {
+      city = 'São Paulo'; // Cidade padrão
+    }
+    
+    return {
+      isWeatherQuery: hasWeatherKeyword,
+      isTimeQuery: hasTimeKeyword,
+      city: city
+    };
+  }
+  
+  return null;
+}
+
 // Função para gerar conteúdo com o modelo Gemini
-async function generateContent(prompt, chatHistory = []) {
+async function generateContent(prompt, chatHistory = [], weatherData = null, timeData = null) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" }); // Alterado para gemini-2.5-pro
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+    
+    let contextInfo = "";
+    if (weatherData) {
+      contextInfo += `\n\nInformações de clima para ${weatherData.cidade}, ${weatherData.pais}:
+- Temperatura: ${weatherData.temperatura}°C (sensação térmica: ${weatherData.sensacao_termica}°C)
+- Descrição: ${weatherData.descricao}
+- Umidade: ${weatherData.umidade}%
+- Vento: ${weatherData.vento} m/s`;
+    }
+    
+    if (timeData) {
+      contextInfo += `\n\nInformações de horário:
+- Hora local: ${timeData.hora_local}
+- Data local: ${timeData.data_local}
+- Timezone: ${timeData.timezone}
+- Offset UTC: ${timeData.offset_utc}h`;
+    }
     
     // Construir o histórico para o contexto
-    const fullPrompt = DIO_PERSONALITY + "\n\nHistórico da conversa:\n" + 
-      chatHistory.map(msg => `${msg.role === "user" ? "Humano" : "DIO"}: ${msg.parts[0].text}`).join("\n") +
+    const fullPrompt = DIO_PERSONALITY + contextInfo + "\n\nHistórico da conversa:\n" + 
+      chatHistory.map(msg => `${msg.role === 'user' ? 'Humano' : 'DIO'}: ${msg.parts[0].text}`).join('\n') +
       "\n\nNova mensagem do humano: " + prompt +
       "\n\nResponda como DIO:";
     
@@ -118,7 +248,7 @@ async function generateContent(prompt, chatHistory = []) {
     const text = response.text();
     return text;
   } catch (error) {
-    console.error("Erro ao gerar conteúdo com a API Gemini:", error);
+    console.error('Erro ao gerar conteúdo com a API Gemini:', error);
     throw error;
   }
 }
@@ -127,11 +257,11 @@ async function generateContent(prompt, chatHistory = []) {
 
 // Rota para obter informações do usuário (IP)
 app.get("/api/user-info", (req, res) => {
-  const userIP = req.headers["x-forwarded-for"] || 
+  const userIP = req.headers['x-forwarded-for'] || 
                  req.connection.remoteAddress || 
                  req.socket.remoteAddress ||
                  (req.connection.socket ? req.connection.socket.remoteAddress : null) ||
-                 "127.0.0.1";
+                 '127.0.0.1';
   
   res.json({
     ip: userIP,
@@ -144,17 +274,37 @@ app.post("/api/chat", async (req, res) => {
   const { message, chatHistory = [] } = req.body;
 
   if (!message) {
-    return res.status(400).json({ error: "Mensagem não fornecida." });
+    return res.status(400).json({ error: 'Mensagem não fornecida.' });
   }
 
   try {
-    const aiResponse = await generateContent(message, chatHistory);
+    let weatherData = null;
+    let timeData = null;
+    
+    // Detectar se é uma pergunta sobre clima ou horário
+    const queryInfo = detectWeatherOrTimeQuery(message);
+    
+    if (queryInfo) {
+      try {
+        if (queryInfo.isWeatherQuery) {
+          weatherData = await getWeatherInfo(queryInfo.city);
+        }
+        if (queryInfo.isTimeQuery) {
+          timeData = await getTimezoneInfo(queryInfo.city);
+        }
+      } catch (apiError) {
+        console.error("Erro ao obter dados das APIs externas:", apiError);
+        // Continuar sem os dados das APIs se houver erro
+      }
+    }
+    
+    const aiResponse = await generateContent(message, chatHistory, weatherData, timeData);
     
     // Atualizar histórico
     const updatedHistory = [
       ...chatHistory,
-      { role: "user", parts: [{ text: message }] },
-      { role: "model", parts: [{ text: aiResponse }] }
+      { role: 'user', parts: [{ text: message }] },
+      { role: 'model', parts: [{ text: aiResponse }] }
     ];
     
     res.json({ 
@@ -162,8 +312,8 @@ app.post("/api/chat", async (req, res) => {
       historico: updatedHistory
     });
   } catch (error) {
-    console.error("Erro ao gerar conteúdo com a API Gemini:", error);
-    res.status(500).json({ error: "Erro ao se comunicar com a API Gemini." });
+    console.error('Erro ao gerar conteúdo com a API Gemini:', error);
+    res.status(500).json({ error: 'Erro ao se comunicar com a API Gemini.' });
   }
 });
 
@@ -181,8 +331,8 @@ app.post("/api/log-connection", async (req, res) => {
     }
 
     const agora = new Date();
-    const dataFormatada = agora.toISOString().split("T")[0]; // YYYY-MM-DD
-    const horaFormatada = agora.toTimeString().split(" ")[0]; // HH:MM:SS
+    const dataFormatada = agora.toISOString().split('T')[0]; // YYYY-MM-DD
+    const horaFormatada = agora.toTimeString().split(' ')[0]; // HH:MM:SS
 
     const logEntry = {
       col_data: dataFormatada,
@@ -194,7 +344,7 @@ app.post("/api/log-connection", async (req, res) => {
     const collection = dbLogs.collection("tb_cl_user_log_acess");
     const result = await collection.insertOne(logEntry);
 
-    console.log("[Servidor] Log de conexão salvo:", result.insertedId);
+    console.log('[Servidor] Log de conexão salvo:', result.insertedId);
     res.status(201).json({ message: "Log de conexão registrado com sucesso!" });
 
   } catch (error) {
@@ -214,7 +364,7 @@ app.post("/api/ranking/registrar-acesso-bot", (req, res) => {
   const acesso = {
     botId,
     nomeBot,
-    usuarioId: usuarioId || "anonimo",
+    usuarioId: usuarioId || 'anonimo',
     acessoEm: timestampAcesso ? new Date(timestampAcesso) : new Date(),
     contagem: 1
   };
@@ -233,7 +383,7 @@ app.post("/api/ranking/registrar-acesso-bot", (req, res) => {
     });
   }
   
-  console.log("[Servidor] Dados de ranking atualizados:", dadosRankingVitrine);
+  console.log('[Servidor] Dados de ranking atualizados:', dadosRankingVitrine);
   res.status(201).json({ message: `Acesso ao bot ${nomeBot} registrado para ranking.` });
 });
 
@@ -258,7 +408,7 @@ app.post("/api/chat/salvar-historico", async (req, res) => {
 
     const novaSessao = {
       sessionId,
-      userId: userId || "anonimo",
+      userId: userId || 'anonimo',
       botId,
       startTime: startTime ? new Date(startTime) : new Date(),
       endTime: endTime ? new Date(endTime) : new Date(),
@@ -269,7 +419,7 @@ app.post("/api/chat/salvar-historico", async (req, res) => {
     const collection = dbHistoria.collection("sessoesChat");
     const result = await collection.insertOne(novaSessao);
 
-    console.log("[Servidor] Histórico de sessão salvo:", result.insertedId);
+    console.log('[Servidor] Histórico de sessão salvo:', result.insertedId);
     res.status(201).json({ message: "Histórico de chat salvo com sucesso!", sessionId: novaSessao.sessionId });
 
   } catch (error) {
@@ -291,10 +441,9 @@ app.get("/api/test", (req, res) => {
 });
 
 // Inicia o servidor
-app.listen(port, "0.0.0.0", () => {
+app.listen(port, '0.0.0.0', () => {
   console.log(`🧛‍♂️ Servidor do Dio-sama rodando em http://0.0.0.0:${port}`);
   console.log("WRYYY! O poder do vampiro imortal está ativo!");
 });
-
 
 

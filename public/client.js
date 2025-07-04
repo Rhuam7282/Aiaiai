@@ -5,8 +5,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const resetButton = document.getElementById("reset-button");
   const statusArea = document.getElementById("status-area");
 
-  // Configuração do backend (será atualizada para a URL do Render no deploy)
-  const backendUrl = window.location.origin; // Para desenvolvimento local e produção
+  // Configuração do backend
+  const backendUrl = 'https://aiaiai-ibk2.onrender.com'; // URL do backend no Render
 
   // Variáveis para controle de sessão
   let currentSessionId = `sessao_${Date.now()}_${Math.random().toString(36).substring(7)}`;
@@ -41,12 +41,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function showTypingIndicator() {
     const typingDiv = document.createElement("div");
-    typingDiv.classList.add("message", "ai-message");
+    typingDiv.classList.add("message", "bot-message", "typing-indicator");
     typingDiv.id = "typing-indicator";
     typingDiv.innerHTML = `
-      <span class="typing-indicator"></span>
-      <span class="typing-indicator"></span>
-      <span class="typing-indicator"></span>
+      <span></span>
+      <span></span>
+      <span></span>
       Dio-sama está pensando...
     `;
     chatContainer.appendChild(typingDiv);
@@ -184,7 +184,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       const data = await response.json();
-      addMessage(data.response, "ai");
+      addMessage(data.response, "bot");
       
       // Atualizar histórico
       chatHistory = data.historico || chatHistory;
@@ -212,7 +212,7 @@ document.addEventListener("DOMContentLoaded", () => {
     chatHistory = [];
     currentSessionId = `sessao_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     chatStartTime = new Date();
-    addMessage("MUDA MUDA MUDA! Você ousa falar com o grande Dio-sama! Faça sua pergunta, mortal insignificante!", "ai");
+    addMessage("MUDA MUDA MUDA! Você ousa falar com o grande Dio-sama! Faça sua pergunta, mortal insignificante! Posso até mesmo revelar informações sobre o clima e horário de qualquer lugar do mundo, se for digno da minha atenção!", "bot");
   }
 
   // --- Event Listeners ---
@@ -237,7 +237,7 @@ document.addEventListener("DOMContentLoaded", () => {
     await registrarAcessoBotParaRanking("chatbotDioSama", "Dio-Sama Chatbot");
     
     // Mensagem de boas-vindas inicial
-    addMessage("WRYYY! Você ousa se aproximar de mim, Dio-sama? Muito bem, mortal... Faça sua pergunta e talvez eu conceda minha sabedoria suprema!", "ai");
+    addMessage("WRYYY! Você ousa se aproximar de mim, Dio-sama? Muito bem, mortal... Faça sua pergunta e talvez eu conceda minha sabedoria suprema! Posso até mesmo revelar os segredos do clima e do tempo de qualquer lugar do mundo!", "bot");
   });
 
   // Salvar histórico quando a página for fechada
