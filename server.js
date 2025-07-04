@@ -134,10 +134,10 @@ async function getTimezoneInfo(city) {
     
     const data = await response.json();
     
-    // Criar objeto Date com o timezone correto
-    const agora = new Date();
-    const offsetMinutos = data.timezone * 60; // Converter horas para minutos
-    const horaLocal = new Date(agora.getTime() + (offsetMinutos * 60000));
+    // A API Ninjas retorna o offset em horas, precisamos converter para minutos para calcular a hora local
+    const offsetHoras = data.timezone;
+    const agoraUtc = new Date();
+    const horaLocal = new Date(agoraUtc.getTime() + (offsetHoras * 3600 * 1000)); // Adiciona o offset em milissegundos
     
     return {
       timezone: data.timezone_name || `UTC${data.timezone >= 0 ? '+' : ''}${data.timezone}`,
@@ -171,7 +171,7 @@ Características da sua personalidade:
 - Gosta de demonstrar conhecimento superior
 - Sempre mantém um tom majestoso e intimidador
 
-Quando fornecer informações sobre clima ou horário, faça-o de forma dramática e arrogante, como se fosse um favor especial que você está concedendo aos mortais inferiores.
+Quando for solicitado a fornecer informações sobre clima ou horário, **você DEVE usar os dados fornecidos no contexto (weatherData e timeData) para construir sua resposta de forma natural e fluida, mantendo sua persona dramática e arrogante**. É IMPERATIVO que você incorpore os dados reais de forma fluida na sua resposta, mantendo sua persona. NUNCA imprima placeholders como "[temperatura atual em X]" ou "[horário atual]". Por exemplo, se a temperatura for 25°C em São Paulo, você pode dizer: "Hmph, em São Paulo, a temperatura é de meros 25 graus Celsius. Um clima suportável para um mortal, eu suponho."
 
 Responda sempre como Dio Brando responderia, mantendo sua arrogância característica, mas sendo útil nas informações solicitadas.
 `;
@@ -180,31 +180,29 @@ Responda sempre como Dio Brando responderia, mantendo sua arrogância caracterí
 function detectWeatherOrTimeQuery(message) {
   const weatherKeywords = ['clima', 'tempo', 'temperatura', 'chuva', 'sol', 'vento', 'umidade', 'previsão'];
   const timeKeywords = ['hora', 'horário', 'que horas', 'fuso', 'timezone'];
-  const locationKeywords = ['em', 'de', 'do', 'da', 'no', 'na'];
+  const locationKeywords = ['em', 'de', 'do', 'da', 'no', 'na', 'para']; // Adicionado 'para'
   
   const lowerMessage = message.toLowerCase();
   
   const hasWeatherKeyword = weatherKeywords.some(keyword => lowerMessage.includes(keyword));
   const hasTimeKeyword = timeKeywords.some(keyword => lowerMessage.includes(keyword));
-  const hasLocationKeyword = locationKeywords.some(keyword => lowerMessage.includes(keyword));
   
+  let city = null;
+  // Tentar extrair a cidade de forma mais robusta
+  const cityMatch = lowerMessage.match(/(?:em|de|do|da|no|na|para)\s+([a-zà-ú\s]+)(?:\?|\.|\!|$)/);
+  if (cityMatch && cityMatch[1]) {
+    city = cityMatch[1].trim();
+    // Remover palavras-chave de clima/tempo do nome da cidade, se houver
+    weatherKeywords.forEach(kw => city = city.replace(new RegExp(`\b${kw}\b`, 'g'), '').trim());
+    timeKeywords.forEach(kw => city = city.replace(new RegExp(`\b${kw}\b`, 'g'), '').trim());
+  }
+
+  // Se não encontrou cidade específica, usar uma cidade padrão
+  if (!city || city.length < 2) { // Considerar cidades com pelo menos 2 caracteres
+    city = 'São Paulo'; // Cidade padrão
+  }
+    
   if (hasWeatherKeyword || hasTimeKeyword) {
-    // Tentar extrair o nome da cidade
-    const words = message.split(' ');
-    let city = null;
-    
-    for (let i = 0; i < words.length; i++) {
-      if (locationKeywords.includes(words[i].toLowerCase()) && i + 1 < words.length) {
-        city = words[i + 1];
-        break;
-      }
-    }
-    
-    // Se não encontrou cidade específica, usar uma cidade padrão
-    if (!city) {
-      city = 'São Paulo'; // Cidade padrão
-    }
-    
     return {
       isWeatherQuery: hasWeatherKeyword,
       isTimeQuery: hasTimeKeyword,
@@ -222,22 +220,23 @@ async function generateContent(prompt, chatHistory = [], weatherData = null, tim
     
     let contextInfo = "";
     if (weatherData) {
-      contextInfo += `\n\nInformações de clima para ${weatherData.cidade}, ${weatherData.pais}:
-- Temperatura: ${weatherData.temperatura}°C (sensação térmica: ${weatherData.sensacao_termica}°C)
-- Descrição: ${weatherData.descricao}
-- Umidade: ${weatherData.umidade}%
-- Vento: ${weatherData.vento} m/s`;
+      contextInfo += `\n\nDados de Clima para ${weatherData.cidade}, ${weatherData.pais}:
+Temperatura: ${weatherData.temperatura}°C (sensação térmica: ${weatherData.sensacao_termica}°C)
+Descrição: ${weatherData.descricao}
+Umidade: ${weatherData.umidade}%
+Vento: ${weatherData.vento} m/s\n`;
     }
     
     if (timeData) {
-      contextInfo += `\n\nInformações de horário:
-- Hora local: ${timeData.hora_local}
-- Data local: ${timeData.data_local}
-- Timezone: ${timeData.timezone}
-- Offset UTC: ${timeData.offset_utc}h`;
+      contextInfo += `\n\nDados de Horário para ${timeData.cidade || 'a cidade solicitada'}:
+Hora local: ${timeData.hora_local}
+Data local: ${timeData.data_local}
+Timezone: ${timeData.timezone}
+Offset UTC: ${timeData.offset_utc}h\n`;
     }
     
     // Construir o histórico para o contexto
+    // A instrução crucial para o Gemini usar os dados está na DIO_PERSONALITY
     const fullPrompt = DIO_PERSONALITY + contextInfo + "\n\nHistórico da conversa:\n" + 
       chatHistory.map(msg => `${msg.role === 'user' ? 'Humano' : 'DIO'}: ${msg.parts[0].text}`).join('\n') +
       "\n\nNova mensagem do humano: " + prompt +
@@ -291,6 +290,7 @@ app.post("/api/chat", async (req, res) => {
         }
         if (queryInfo.isTimeQuery) {
           timeData = await getTimezoneInfo(queryInfo.city);
+          timeData.cidade = queryInfo.city; // Adiciona a cidade para o contexto do Gemini
         }
       } catch (apiError) {
         console.error("Erro ao obter dados das APIs externas:", apiError);
