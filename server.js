@@ -428,6 +428,88 @@ app.post("/api/chat/salvar-historico", async (req, res) => {
   }
 });
 
+// Novas rotas para adicionar ao server.js após a rota de salvar histórico
+
+// Rota para buscar lista de históricos de conversas
+app.get("/api/chat/historicos", async (req, res) => {
+  if (!dbHistoria) {
+    return res.status(500).json({ error: "Servidor não conectado ao banco de dados de histórico." });
+  }
+
+  try {
+    const { limit = 20, userId = 'anonimo' } = req.query;
+    
+    const collection = dbHistoria.collection("sessoesChat");
+    
+    // Buscar as últimas sessões, ordenadas por data de criação (mais recentes primeiro)
+    const historicos = await collection
+      .find({ userId: userId })
+      .sort({ startTime: -1 })
+      .limit(parseInt(limit))
+      .project({
+        sessionId: 1,
+        botId: 1,
+        startTime: 1,
+        endTime: 1,
+        // Pegar apenas a primeira mensagem do usuário como preview
+        preview: { $arrayElemAt: ["$messages", 0] }
+      })
+      .toArray();
+
+    // Formatar os dados para o frontend
+    const historicosFormatados = historicos.map(hist => ({
+      sessionId: hist.sessionId,
+      botId: hist.botId,
+      startTime: hist.startTime,
+      endTime: hist.endTime,
+      preview: hist.preview ? hist.preview.parts[0].text.substring(0, 50) + "..." : "Conversa sem mensagens"
+    }));
+
+    res.json({ 
+      historicos: historicosFormatados,
+      total: historicosFormatados.length
+    });
+
+  } catch (error) {
+    console.error("[Servidor] Erro em /api/chat/historicos:", error.message);
+    res.status(500).json({ error: "Erro interno ao buscar históricos de chat." });
+  }
+});
+
+// Rota para buscar uma sessão específica por sessionId
+app.get("/api/chat/historico/:sessionId", async (req, res) => {
+  if (!dbHistoria) {
+    return res.status(500).json({ error: "Servidor não conectado ao banco de dados de histórico." });
+  }
+
+  try {
+    const { sessionId } = req.params;
+    
+    if (!sessionId) {
+      return res.status(400).json({ error: "sessionId é obrigatório." });
+    }
+
+    const collection = dbHistoria.collection("sessoesChat");
+    const sessao = await collection.findOne({ sessionId: sessionId });
+
+    if (!sessao) {
+      return res.status(404).json({ error: "Sessão não encontrada." });
+    }
+
+    res.json({
+      sessionId: sessao.sessionId,
+      botId: sessao.botId,
+      startTime: sessao.startTime,
+      endTime: sessao.endTime,
+      messages: sessao.messages
+    });
+
+  } catch (error) {
+    console.error("[Servidor] Erro em /api/chat/historico/:sessionId:", error.message);
+    res.status(500).json({ error: "Erro interno ao buscar sessão específica." });
+  }
+});
+
 // Rota de teste
 app.get("/api/test", (req, res) => {
   res.json({ 
@@ -447,3 +529,8 @@ app.listen(port, '0.0.0.0', () => {
 });
 
 
+<<<<<<< HEAD
+
+
+=======
+>>>>>>> 24c170f7ba44e6aba6e5834b95f2465909f20e9f
