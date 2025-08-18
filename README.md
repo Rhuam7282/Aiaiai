@@ -215,10 +215,6 @@ O chatbot foi programado com as seguintes características:
 
 Este projeto é desenvolvido para fins educacionais. JoJo's Bizarre Adventure é propriedade de Hirohiko Araki.
 
-## 👨‍💻 Autor
-
-Desenvolvido por [Seu Nome] como parte do projeto acadêmico de Inteligência Artificial.
-
 ---
 
 **MUDA MUDA MUDA!** 🧛‍♂️✨
