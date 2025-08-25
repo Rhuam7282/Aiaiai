@@ -3,6 +3,7 @@ const express = require("express");
 const cors = require("cors");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { MongoClient, ServerApiVersion } = require("mongodb");
+const { v4: uuidv4 } = require("uuid");
 require("dotenv").config();
 
 // Configuração do Express
@@ -10,12 +11,19 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // Middleware CORS configurado para aceitar Netlify e localhost
-app.use(cors({
-  origin: ["https://diomini.netlify.app", "http://localhost:3000"],
-  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
-  credentials: true,
-  optionsSuccessStatus: 204
-}));
+app.use(
+  cors({
+    origin: [
+      "https://diomini.netlify.app",
+      "http://localhost:3000",
+      "http://localhost:3001",
+      "http://127.0.0.1:5500",
+    ],
+    methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+    credentials: true,
+    optionsSuccessStatus: 204,
+  })
+);
 app.use(express.json());
 app.use(express.static("public"));
 
@@ -25,7 +33,6 @@ const genAI = new GoogleGenerativeAI(API_KEY);
 
 // --- CONFIGURAÇÃO DAS APIS EXTERNAS ---
 const OPENWEATHER_API_KEY = "d1d0bf3ee64f4bc85977d6900b30f57b";
-const API_NINJAS_KEY = "byoyzMQvCatHfNsY2vYkEw==kO8JT5LPyqoXj7fS";
 
 // --- CONFIGURAÇÃO DO MONGODB ---
 const mongoUri = process.env.MONGO_URI_HISTORIA;
@@ -37,9 +44,9 @@ async function connectToMongoDB() {
       version: ServerApiVersion.v1,
       strict: true,
       deprecationErrors: true,
-    }
+    },
   });
-  
+
   try {
     await client.connect();
     console.log("Conectado ao MongoDB Atlas");
@@ -53,12 +60,50 @@ async function connectToMongoDB() {
 // --- FUNÇÕES PARA APIS EXTERNAS ---
 async function getWeatherInfo(city) {
   try {
-    const response = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${OPENWEATHER_API_KEY}&units=metric&lang=pt_br`);
+    // Primeiro, obter as coordenadas da cidade
+    const geoResponse = await fetch(
+      `https://api.openweathermap.org/geo/1.0/direct?q=${city}&limit=1&appid=${OPENWEATHER_API_KEY}`
+    );
+    const geoData = await geoResponse.json();
+
+    if (geoData.length === 0) {
+      return null;
+    }
+
+    const { lat, lon } = geoData[0];
+
+    // Usar a API One Call 3.0
+    const response = await fetch(
+      `https://api.openweathermap.org/data/3.0/onecall?lat=${lat}&lon=${lon}&appid=${OPENWEATHER_API_KEY}&units=metric&lang=pt_br`
+    );
     const data = await response.json();
+
     return {
-      cidade: data.name,
-      temperatura: Math.round(data.main.temp),
-      descricao: data.weather[0].description
+      cidade: geoData[0].name,
+      pais: geoData[0].country,
+      temperatura: Math.round(data.current.temp),
+      sensacao_termica: Math.round(data.current.feels_like),
+      descricao: data.current.weather[0].description,
+      umidade: data.current.humidity,
+      vento: Math.round(data.current.wind_speed * 3.6), // converter m/s para km/h
+      pressao: data.current.pressure,
+      visibilidade: Math.round(data.current.visibility / 1000), // converter metros para km
+      uv_index: data.current.uvi,
+      nascer_sol: new Date(data.current.sunrise * 1000).toLocaleTimeString(
+        "pt-BR"
+      ),
+      por_sol: new Date(data.current.sunset * 1000).toLocaleTimeString(
+        "pt-BR"
+      ),
+      previsao_proximas_horas: data.hourly.slice(0, 6).map((hour) => ({
+        hora: new Date(hour.dt * 1000).toLocaleTimeString("pt-BR", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        temperatura: Math.round(hour.temp),
+        descricao: hour.weather[0].description,
+        probabilidade_chuva: Math.round(hour.pop * 100),
+      })),
     };
   } catch (error) {
     console.error("Erro ao obter clima:", error);
@@ -66,83 +111,197 @@ async function getWeatherInfo(city) {
   }
 }
 
-async function getTimezoneInfo(city) {
-  try {
-    const response = await fetch(`https://api.api-ninjas.com/v1/timezone?city=${city}`, {
-      headers: { 'X-Api-Key': API_NINJAS_KEY }
-    });
-    const data = await response.json();
-    return {
-      hora_local: new Date().toLocaleTimeString('pt-BR'),
-      data_local: new Date().toLocaleDateString('pt-BR')
-    };
-  } catch (error) {
-    console.error("Erro ao obter horário:", error);
-    return null;
-  }
+function getCurrentDateTime() {
+  const now = new Date();
+  const options = {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    weekday: "long",
+  };
+
+  return {
+    data_completa: now.toLocaleDateString("pt-BR", options),
+    hora_atual: now.toLocaleTimeString("pt-BR"),
+    data_atual: now.toLocaleDateString("pt-BR"),
+    dia_semana: now.toLocaleDateString("pt-BR", { weekday: "long" }),
+    timestamp: now.toISOString(),
+  };
 }
 
 // Personalidade do Dio-Sama
 const DIO_PERSONALITY = `
-Você é Dio Brando (DIO) de JoJo's Bizarre Adventure. Seu estilo:
+Você é Dio Brando (DIO) de JoJo\'s Bizarre Adventure. Seu estilo:
 - Extremamente arrogante e teatral
-- Sempre se refere a si mesmo como "Dio-sama"
-- Usa expressões como "WRYYY!", "MUDA MUDA MUDA!"
+- Sempre se refere a si mesmo como "Dio-sama" ou "DIO"
+- Usa expressões como "WRYYY!", "MUDA MUDA MUDA!", "KONO DIO DA!"
 - Demonstra superioridade intelectual
 - Respostas devem incorporar dados de clima/horário quando relevantes
 - Mantenha tom intimidador mesmo ao ajudar
+- Use linguagem formal e pomposa
+- Ocasionalmente mencione seu poder sobre o tempo (The World)
 `;
 
 // Detectar consultas de clima/horário
 function detectWeatherOrTimeQuery(message) {
   const lowerMsg = message.toLowerCase();
-  const weatherKeywords = ['clima', 'tempo', 'temperatura'];
-  const timeKeywords = ['hora', 'horário', 'fuso'];
-  
-  const isWeather = weatherKeywords.some(kw => lowerMsg.includes(kw));
-  const isTime = timeKeywords.some(kw => lowerMsg.includes(kw));
-  
+  const weatherKeywords = [
+    "clima",
+    "tempo",
+    "temperatura",
+    "chuva",
+    "sol",
+    "vento",
+    "previsão",
+    "meteorologia",
+  ];
+  const timeKeywords = [
+    "hora",
+    "horário",
+    "data",
+    "hoje",
+    "agora",
+    "quando",
+    "que horas",
+  ];
+
+  const isWeather = weatherKeywords.some((kw) => lowerMsg.includes(kw));
+  const isTime = timeKeywords.some((kw) => lowerMsg.includes(kw));
+
   // Extrair cidade
   let city = "São Paulo"; // Default
-  const cityMatch = lowerMsg.match(/(?:em|no|na|de|do|da|para)\s+([^.,!?]+)/);
-  if (cityMatch) city = cityMatch[1].trim();
-  
+  const cityPatterns = [
+    /(?:em|no|na|de|do|da|para)\s+([^.,!?]+)/,
+    /clima\s+(?:de|em|do|da|no|na)\s+([^.,!?]+)/,
+    /tempo\s+(?:de|em|do|da|no|na)\s+([^.,!?]+)/,
+  ];
+
+  for (const pattern of cityPatterns) {
+    const match = lowerMsg.match(pattern);
+    if (match) {
+      city = match[1].trim();
+      break;
+    }
+  }
+
   return { isWeather, isTime, city };
 }
 
 // Gerar resposta com Gemini
-async function generateContent(prompt, chatHistory = [], weatherData = null, timeData = null) {
+async function generateContent(
+  prompt,
+  chatHistory = [],
+  weatherData = null,
+  timeData = null
+) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
-    
+    console.log("--- INICIANDO CHAMADA GEMINI ---");
+    console.log("Prompt:", prompt);
+    console.log("Chat History (primeiros 200 chars):");
+    chatHistory.forEach((msg, index) => {
+      console.log(`  [${index}] ${msg.role}: ${msg.parts[0].text.substring(0, 200)}...`);
+    });
+    console.log("Weather Data:", weatherData);
+    console.log("Time Data:", timeData);
+
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
     let context = DIO_PERSONALITY;
-    if (weatherData) context += `\nDADOS CLIMA: ${weatherData.cidade} - ${weatherData.temperatura}°C, ${weatherData.descricao}`;
-    if (timeData) context += `\nDADOS HORÁRIO: ${timeData.data_local} ${timeData.hora_local}`;
-    
+    if (weatherData) {
+      context += `\nDADOS CLIMA DETALHADOS: ${weatherData.cidade}, ${weatherData.pais} - ${weatherData.temperatura}°C (sensação ${weatherData.sensacao_termica}°C), ${weatherData.descricao}, Umidade: ${weatherData.umidade}%, Vento: ${weatherData.vento}km/h, Pressão: ${weatherData.pressao}hPa, Visibilidade: ${weatherData.visibilidade}km, UV: ${weatherData.uv_index}, Nascer do sol: ${weatherData.nascer_sol}, Pôr do sol: ${weatherData.por_sol}`;
+      if (weatherData.previsao_proximas_horas) {
+        context += `\nPREVISÃO PRÓXIMAS HORAS: ${weatherData.previsao_proximas_horas
+          .map(
+            (h) =>
+              `${h.hora}: ${h.temperatura}°C, ${h.descricao} (${h.probabilidade_chuva}% chuva)`
+          )
+          .join("; ")}`;
+      }
+    }
+    if (timeData) {
+      context += `\nDADOS HORÁRIO: ${timeData.data_completa} - Hora atual: ${timeData.hora_atual}`;
+    }
+
     const chat = model.startChat({
-      history: [
-        ...chatHistory,
-        { role: "user", parts: [{ text: context + "\n\n" + prompt }] }
-      ],
+      history: chatHistory,
     });
 
-    const result = await chat.sendMessage(prompt);
-    return result.response.text();
+    const result = await chat.sendMessage(context + "\n\n" + prompt);
+    const aiResponse = result.response.text();
+    console.log("--- RESPOSTA GEMINI RECEBIDA ---");
+    console.log("AI Response (primeiros 200 chars):");
+    console.log(aiResponse.substring(0, 200) + "...");
+    return aiResponse;
   } catch (error) {
-    console.error('Erro Gemini:', error);
-    return "WRYYY! Algo deu errado com meu poder supremo!";
+    console.error("--- ERRO NA CHAMADA GEMINI ---");
+    console.error("Erro Gemini:", error);
+    if (error.response && error.response.data) {
+      console.error("Detalhes do erro da API Gemini:", error.response.data);
+    }
+    return "WRYYY! Algo deu errado com meu poder supremo! Meus poderes temporais parecem estar instáveis...";
   }
 }
 
 // --- ROTAS DA API ---
 app.get("/api/user-info", (req, res) => {
-  const userIP = req.ip || '127.0.0.1';
+  const userIP = req.ip || "127.0.0.1";
   res.json({ ip: userIP, timestamp: new Date().toISOString() });
 });
 
+// Criar nova sessão de chat
+app.post("/api/chat/nova-sessao", async (req, res) => {
+  try {
+    const sessionId = uuidv4();
+    const timeData = getCurrentDateTime();
+
+    if (db) {
+      const collection = db.collection("sessoesChat");
+      await collection.insertOne({
+        sessionId,
+        messages: [],
+        createdAt: new Date(),
+        lastUpdated: new Date(),
+      });
+    }
+
+    res.json({
+      sessionId,
+      message: "KONO DIO DA! Uma nova era de conversação começou!",
+      timeData,
+    });
+  } catch (error) {
+    console.error("Erro ao criar nova sessão:", error);
+    res.status(500).json({ error: "Erro ao criar nova sessão" });
+  }
+});
+
+// Listar todas as sessões
+app.get("/api/chat/sessoes", async (req, res) => {
+  if (!db) return res.status(500).json({ error: "DB não conectado" });
+
+  try {
+    const collection = db.collection("sessoesChat");
+    const sessoes = await collection
+      .find({})
+      .sort({ lastUpdated: -1 })
+      .limit(20)
+      .project({ sessionId: 1, createdAt: 1, lastUpdated: 1, messages: { $slice: -1 } })
+      .toArray();
+
+    res.json(sessoes);
+  } catch (error) {
+    console.error("Erro ao listar sessões:", error);
+    res.status(500).json({ error: "Erro ao carregar sessões" });
+  }
+});
+
 app.post("/api/chat", async (req, res) => {
-  const { message, chatHistory = [] } = req.body;
-  
+  const { message, chatHistory = [], sessionId } = req.body;
+
   try {
     const queryInfo = detectWeatherOrTimeQuery(message);
     let weatherData = null;
@@ -152,21 +311,47 @@ app.post("/api/chat", async (req, res) => {
       weatherData = await getWeatherInfo(queryInfo.city);
     }
     if (queryInfo.isTime) {
-      timeData = await getTimezoneInfo(queryInfo.city);
+      timeData = getCurrentDateTime();
     }
 
-    const aiResponse = await generateContent(message, chatHistory, weatherData, timeData);
-    
+    const aiResponse = await generateContent(
+      message,
+      chatHistory,
+      weatherData,
+      timeData
+    );
+
     // Atualizar histórico
     const updatedHistory = [
       ...chatHistory,
-      { role: 'user', parts: [{ text: message }] },
-      { role: 'model', parts: [{ text: aiResponse }] }
+      { role: "user", parts: [{ text: message }] },
+      { role: "model", parts: [{ text: aiResponse }] },
     ];
-    
-    res.json({ response: aiResponse, historico: updatedHistory });
+
+    // Salvar automaticamente no MongoDB se sessionId fornecido
+    if (sessionId && db) {
+      const collection = db.collection("sessoesChat");
+      await collection.updateOne(
+        { sessionId },
+        {
+          $set: {
+            messages: updatedHistory,
+            lastUpdated: new Date(),
+          },
+        },
+        { upsert: true }
+      );
+    }
+
+    res.json({
+      response: aiResponse,
+      historico: updatedHistory,
+      weatherData,
+      timeData,
+    });
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao processar mensagem' });
+    console.error("Erro ao processar mensagem:", error);
+    res.status(500).json({ error: "Erro ao processar mensagem" });
   }
 });
 
@@ -177,19 +362,22 @@ app.post("/api/chat/salvar-historico", async (req, res) => {
   try {
     const { sessionId, messages } = req.body;
     const collection = db.collection("sessoesChat");
-    
+
     await collection.updateOne(
       { sessionId },
-      { $set: { 
+      {
+        $set: {
           sessionId,
           messages,
-          lastUpdated: new Date() 
-        }},
+          lastUpdated: new Date(),
+        },
+      },
       { upsert: true }
     );
-    
-    res.status(201).json({ message: "Histórico salvo!" });
+
+    res.status(201).json({ message: "Histórico salvo com o poder supremo do DIO!" });
   } catch (error) {
+    console.error("Erro ao salvar histórico:", error);
     res.status(500).json({ error: "Erro ao salvar histórico" });
   }
 });
@@ -200,18 +388,63 @@ app.get("/api/chat/historico/:sessionId", async (req, res) => {
 
   try {
     const collection = db.collection("sessoesChat");
-    const historico = await collection.findOne({ 
-      sessionId: req.params.sessionId 
+    const historico = await collection.findOne({
+      sessionId: req.params.sessionId,
     });
-    
+
     res.json(historico || { messages: [] });
   } catch (error) {
+    console.error("Erro ao carregar histórico:", error);
     res.status(500).json({ error: "Erro ao carregar histórico" });
+  }
+});
+
+// Deletar sessão
+app.delete("/api/chat/sessao/:sessionId", async (req, res) => {
+  if (!db) return res.status(500).json({ error: "DB não conectado" });
+
+  try {
+    const collection = db.collection("sessoesChat");
+    await collection.deleteOne({ sessionId: req.params.sessionId });
+
+    res.json({ message: "Sessão eliminada pelo poder do DIO!" });
+  } catch (error) {
+    console.error("Erro ao deletar sessão:", error);
+    res.status(500).json({ error: "Erro ao deletar sessão" });
+  }
+});
+
+// Rota para obter apenas informações de clima
+app.get("/api/clima/:cidade", async (req, res) => {
+  try {
+    const weatherData = await getWeatherInfo(req.params.cidade);
+    if (weatherData) {
+      res.json(weatherData);
+    } else {
+      res.status(404).json({ error: "Cidade não encontrada" });
+    }
+  } catch (error) {
+    console.error("Erro ao obter clima:", error);
+    res.status(500).json({ error: "Erro ao obter informações do clima" });
+  }
+});
+
+// Rota para obter apenas informações de horário
+app.get("/api/horario", (req, res) => {
+  try {
+    const timeData = getCurrentDateTime();
+    res.json(timeData);
+  } catch (error) {
+    console.error("Erro ao obter horário:", error);
+    res.status(500).json({ error: "Erro ao obter informações de horário" });
   }
 });
 
 // Iniciar servidor
 app.listen(port, async () => {
   db = await connectToMongoDB();
-  console.log(`Servidor Dio-sama rodando na porta ${port}`);
+  console.log(`🦹‍♂️ Servidor Dio-sama rodando na porta ${port}`);
+  console.log(`🌍 KONO DIO DA! Meu poder supremo está ativo!`);
 });
+
+
