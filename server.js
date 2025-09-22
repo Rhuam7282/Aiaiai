@@ -5,10 +5,14 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { MongoClient, ServerApiVersion } = require("mongodb");
 const { v4: uuidv4 } = require("uuid");
 require("dotenv").config();
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
 
 // Configuração do Express
 const app = express();
 const port = process.env.PORT || 3000;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+const JWT_SECRET = process.env.JWT_SECRET;
 
 // Middleware CORS configurado para aceitar Netlify e localhost
 app.use(
@@ -452,4 +456,147 @@ app.listen(port, async () => {
   console.log(`🌍 KONO DIO DA! Meu poder supremo está ativo!`);
 });
 
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
 
+  if (token == null) return res.sendStatus(401);
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) return res.sendStatus(403);
+    req.user = user;
+    next();
+  });
+}
+
+// Rota de login do administrador
+app.post('/api/admin/login', async (req, res) => {
+  const { password } = req.body;
+
+  if (!password) {
+    return res.status(400).json({ error: 'Senha é obrigatória' });
+  }
+
+  try {
+    // Verificar senha
+    if (password !== ADMIN_PASSWORD) {
+      return res.status(401).json({ error: 'Senha incorreta' });
+    }
+
+    // Gerar token JWT
+    const token = jwt.sign({ role: 'admin' }, JWT_SECRET, { expiresIn: '1h' });
+
+    res.json({ 
+      token,
+      message: 'Login realizado com sucesso! Bem-vindo, administrador!' 
+    });
+  } catch (error) {
+    console.error('Erro no login:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Rota para obter estatísticas do admin (protegida)
+app.get('/api/admin/stats', authenticateToken, async (req, res) => {
+  if (!db) return res.status(500).json({ error: 'DB não conectado' });
+
+  try {
+    const collection = db.collection('sessoesChat');
+
+    /*Obtém estatísticas gerais do chatbot*/
+    // Total de conversas
+    const totalConversas = await collection.countDocuments();
+
+    // Total de mensagens trocadas (em todas as conversas)
+    const sessoes = await collection.find({}).toArray();
+    let totalMensagens = 0;
+    sessoes.forEach(sessao => {
+      totalMensagens += sessao.messages ? sessao.messages.length : 0;
+    });
+
+    // Últimas 5 conversas
+    const ultimasConversas = await collection
+      .find({})
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .project({ sessionId: 1, createdAt: 1, messages: { $slice: -1 } })
+      .toArray();
+
+    res.json({
+      totalConversas,
+      totalMensagens,
+      ultimasConversas: ultimasConversas.map(conv => ({
+        sessionId: conv.sessionId,
+        createdAt: conv.createdAt,
+        lastMessage: conv.messages && conv.messages.length > 0 ? 
+          conv.messages[conv.messages.length - 1].parts[0].text.substring(0, 100) + '...' : 
+          'Nenhuma mensagem'
+      }))
+    });
+  } catch (error) {
+    console.error('Erro ao obter estatísticas:', error);
+    res.status(500).json({ error: 'Erro ao obter estatísticas' });
+  }
+});
+
+// Rota para excluir todas as conversas (protegida)
+app.delete('/api/admin/conversas', authenticateToken, async (req, res) => {
+  if (!db) return res.status(500).json({ error: 'DB não conectado' });
+
+  try {
+    /*Exclui todas as conversas do banco de dados*/
+    const collection = db.collection('sessoesChat');
+    await collection.deleteMany({});
+    
+    res.json({ message: 'Todas as conversas foram excluídas com o poder do DIO!' });
+  } catch (error) {
+    console.error('Erro ao excluir conversas:', error);
+    res.status(500).json({ error: 'Erro ao excluir conversas' });
+  }
+});
+
+// Rota para excluir uma conversa específica (protegida)
+app.delete('/api/admin/conversas/:sessionId', authenticateToken, async (req, res) => {
+  if (!db) return res.status(500).json({ error: 'DB não conectado' });
+
+  try {
+    /*Exclui uma conversa específica por sessionId*/
+    const collection = db.collection('sessoesChat');
+    await collection.deleteOne({ sessionId: req.params.sessionId });
+    
+    res.json({ message: 'Conversa eliminada pelo poder do DIO!' });
+  } catch (error) {
+    console.error('Erro ao excluir conversa:', error);
+    res.status(500).json({ error: 'Erro ao excluir conversa' });
+  }
+});
+
+// Rota para obter a personalidade atual (protegida)
+app.get('/api/admin/personalidade', authenticateToken, (req, res) => {
+  /*Retorna a personalidade atual do chatbot*/
+  res.json({ personalidade: DIO_PERSONALITY });
+});
+
+// Rota para atualizar a personalidade (protegida)
+app.put('/api/admin/personalidade', authenticateToken, (req, res) => {
+  const { novaPersonalidade } = req.body;
+
+  if (!novaPersonalidade) {
+    return res.status(400).json({ error: 'Nova personalidade é obrigatória' });
+  }
+
+  try {
+    /*Atualiza a personalidade global do chatbot*/
+    DIO_PERSONALITY = novaPersonalidade;
+    
+    res.json({ 
+      message: 'Personalidade atualizada com o poder supremo do DIO!',
+      personalidade: DIO_PERSONALITY
+    });
+  } catch (error) {
+    console.error('Erro ao atualizar personalidade:', error);
+    res.status(500).json({ error: 'Erro ao atualizar personalidade' });
+  }
+});
+
+app.use(express.static("public"));
