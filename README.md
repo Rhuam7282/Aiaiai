@@ -1,87 +1,143 @@
-# 🧛‍♂️ Dio-Sama Chatbot
+# 🧛‍♂️ DIOMINI - Chatbot do Dio-Sama
 
-Um chatbot com a personalidade icônica do Dio Brando de JoJo's Bizarre Adventure, desenvolvido com Node.js, Express, Google Gemini AI e MongoDB.
+<div align="center">
 
-## 🌟 Características
+![Status](https://img.shields.io/badge/status-ativo-success.svg)
+![Node](https://img.shields.io/badge/node-18.x-green.svg)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
-- **Personalidade Autêntica**: Respostas no estilo arrogante e dramático do Dio-sama
-- **Interface Temática**: Design inspirado no visual dourado e majestoso do personagem
-- **Integração com IA**: Powered by Google Gemini para respostas inteligentes
-- **Sistema de Logs**: Registro de acessos em MongoDB Atlas compartilhado
-- **Histórico de Conversas**: Armazenamento completo das sessões de chat
-- **Sistema de Ranking**: Simulação de dados de popularidade dos bots
+**"KONO DIO DA! Um chatbot com a personalidade mais arrogante do anime!"**
 
-## 🚀 Tecnologias Utilizadas
+[🚀 Demo ao Vivo](#-demo) • [📖 Documentação](#-documentação) • [🛠️ Instalação](#️-instalação) • [🎯 Features](#-features)
+
+</div>
+
+---
+
+## 🎭 Sobre o Projeto
+
+**DIOMINI** é um chatbot inteligente que incorpora a personalidade icônica de **Dio Brando** de JoJo's Bizarre Adventure. Desenvolvido com tecnologias modernas de IA e design temático único, o projeto oferece uma experiência de conversação imersiva e teatral.
+
+### 🌟 Destaques
+
+- 🤖 **IA Avançada**: Powered by Google Gemini 2.5 Flash
+- 🌤️ **Integração Climática**: Dados em tempo real via OpenWeather API
+- 🕐 **Consciência Temporal**: Sistema de horário integrado
+- 💾 **Persistência**: Histórico completo em MongoDB Atlas
+- 🎨 **Design Temático**: Interface inspirada no visual dourado do personagem
+- 🔐 **Painel Admin**: Sistema de gerenciamento com autenticação JWT
+
+---
+
+## 🚀 Demo
+
+### 🌐 Acesse Agora
+- **Frontend**: [https://diomini.netlify.app](https://diomini.netlify.app)
+- **Backend API**: Hospedado no Render.com
+
+### 📸 Capturas de Tela
+
+```
+[Adicione aqui GIFs ou screenshots da aplicação funcionando]
+- Tela de chat principal
+- Consulta de clima
+- Painel administrativo
+- Histórico de conversas
+```
+
+---
+
+## 🎯 Features
+
+### ⚡ Funcionalidades Principais
+
+- ✨ **Personalidade Autêntica**
+  - Respostas dramáticas e arrogantes no estilo Dio-sama
+  - Frases icônicas: "WRYYY!", "MUDA MUDA!", "KONO DIO DA!"
+  - Tom majestoso e intimidador
+
+- 🌍 **Integração com APIs Externas**
+  - Consultas climáticas detalhadas (temperatura, umidade, previsão)
+  - Informações de horário em tempo real
+  - Dados de UV, nascer/pôr do sol, e mais
+
+- 💬 **Sistema de Chat Avançado**
+  - Histórico persistente de conversas
+  - Múltiplas sessões simultâneas
+  - Indicadores de digitação e carregamento
+  - Detecção automática de consultas meteorológicas
+
+- 🛡️ **Painel Administrativo**
+  - Login seguro com JWT
+  - Estatísticas em tempo real
+  - Gerenciamento de conversas
+  - Customização da personalidade do bot
+
+---
+
+## 🛠️ Tech Stack
 
 ### Backend
-- **Node.js** com Express
-- **Google Gemini AI** para geração de respostas
-- **MongoDB Atlas** para persistência de dados
-- **CORS** para comunicação frontend-backend
+![Node.js](https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white)
+![Express](https://img.shields.io/badge/Express.js-404D59?style=for-the-badge)
+![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)
 
 ### Frontend
-- **HTML5** semântico
-- **CSS3** com gradientes e animações
-- **JavaScript** vanilla para interatividade
-- **Design Responsivo** para mobile e desktop
+![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)
+![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
 
-## 📁 Estrutura do Projeto
+### APIs & Serviços
+- **Google Gemini AI** (2.5 Flash) - Geração de respostas inteligentes
+- **OpenWeather API** (One Call 3.0) - Dados meteorológicos
+- **MongoDB Atlas** - Banco de dados em nuvem
+- **JWT** - Autenticação segura
+- **bcrypt** - Hash de senhas
 
-```
-projeto_dio_sama/
-├── server.js              # Servidor principal
-├── package.json           # Dependências e scripts
-├── .env.example          # Exemplo de variáveis de ambiente
-├── .gitignore            # Arquivos ignorados pelo Git
-├── README.md             # Documentação
-└── public/               # Frontend
-    ├── index.html        # Página principal
-    ├── style.css         # Estilos
-    └── client.js         # Lógica do frontend
-```
+### Hospedagem
+- **Render.com** - Backend
+- **Netlify** - Frontend
 
-## 🛠️ Configuração e Instalação
+---
 
-### 1. Pré-requisitos
+## 🏗️ Instalação
+
+### Pré-requisitos
 - Node.js 18.x ou superior
-- Conta no Google AI Studio (para Gemini API)
-- Conta no MongoDB Atlas
+- Conta no [Google AI Studio](https://aistudio.google.com/)
+- Conta no [MongoDB Atlas](https://www.mongodb.com/cloud/atlas)
+- Conta no [OpenWeather](https://openweathermap.org/api) (opcional - chave incluída)
 
-### 2. Instalação Local
-
+### 1️⃣ Clone o Repositório
 ```bash
-# Clone o repositório
-git clone [URL_DO_REPOSITORIO]
-cd projeto_dio_sama
-
-# Instale as dependências
-npm install
-
-# Configure as variáveis de ambiente
-cp .env.example .env
-# Edite o arquivo .env com suas credenciais
+git clone https://github.com/seu-usuario/dio-sama-chatbot.git
+cd dio-sama-chatbot
 ```
 
-### 3. Variáveis de Ambiente
+### 2️⃣ Instale as Dependências
+```bash
+npm install
+```
 
-Crie um arquivo `.env` com as seguintes variáveis:
+### 3️⃣ Configure as Variáveis de Ambiente
+Crie um arquivo `.env` na raiz do projeto:
 
 ```env
-# Chave da API do Google Gemini
+# API do Google Gemini
 GEMINI_API_KEY=sua_chave_aqui
 
-# URI do MongoDB para logs (banco compartilhado)
-MONGO_URI_LOGS=mongodb+srv://user_log_acess:Log4c3ss2025@cluster0.nbt3sks.mongodb.net/IIW2023A_Logs?retryWrites=true&w=majority&appName=Cluster0
+# MongoDB (obtenha no MongoDB Atlas)
+MONGO_URI_HISTORIA=mongodb+srv://usuario:senha@cluster.mongodb.net/chatbotHistoriaDB
 
-# URI do MongoDB para histórico (banco individual)
-MONGO_URI_HISTORIA=mongodb+srv://seu_usuario:sua_senha@seu-cluster.mongodb.net/chatbotHistoriaDB?retryWrites=true&w=majority
+# Segurança Admin
+ADMIN_PASSWORD=sua_senha_admin
+JWT_SECRET=seu_secret_jwt_super_secreto
 
-# Porta do servidor (opcional)
-PORT=8080
+# Porta (opcional)
+PORT=3000
 ```
 
-### 4. Execução Local
-
+### 4️⃣ Execute o Servidor
 ```bash
 # Desenvolvimento
 npm run dev
@@ -90,132 +146,193 @@ npm run dev
 npm start
 ```
 
-O servidor estará disponível em `http://localhost:8080`
-
-## 🌐 Deploy
-
-### Deploy no Render.com
-
-1. **Preparação**:
-   - Faça commit de todas as alterações
-   - Push para o GitHub
-
-2. **Configuração no Render**:
-   - Crie um novo "Web Service"
-   - Conecte seu repositório GitHub
-   - Configure:
-     - **Build Command**: `npm install`
-     - **Start Command**: `npm start`
-     - **Instance Type**: Free
-
-3. **Variáveis de Ambiente**:
-   - Adicione todas as variáveis do arquivo `.env`
-   - Especialmente `GEMINI_API_KEY`, `MONGO_URI_LOGS` e `MONGO_URI_HISTORIA`
-
-4. **Deploy**:
-   - Inicie o deploy
-   - Acompanhe os logs
-   - Obtenha a URL pública
-
-### Deploy do Frontend no Netlify
-
-1. **Preparação**:
-   - Atualize a URL do backend no `client.js` (se necessário)
-   - Commit e push das alterações
-
-2. **Configuração no Netlify**:
-   - Conecte o repositório do frontend
-   - Configure o diretório de publicação como `public/`
-   - Deploy automático
-
-## 📊 Endpoints da API
-
-### Chat
-- `POST /api/chat` - Enviar mensagem para o chatbot
-- `GET /api/user-info` - Obter informações do usuário (IP)
-
-### Logs
-- `POST /api/log-connection` - Registrar acesso do usuário
-
-### Ranking
-- `POST /api/ranking/registrar-acesso-bot` - Registrar acesso para ranking
-- `GET /api/ranking/visualizar` - Visualizar dados de ranking
-
-### Histórico
-- `POST /api/chat/salvar-historico` - Salvar histórico da sessão
-
-### Teste
-- `GET /api/test` - Verificar status do servidor
-
-## 🗄️ Estrutura do Banco de Dados
-
-### Coleção: tb_cl_user_log_acess (Logs)
-```javascript
-{
-  col_data: "2024-01-15",      // Data no formato YYYY-MM-DD
-  col_hora: "14:30:25",        // Hora no formato HH:MM:SS
-  col_IP: "192.168.1.1",       // IP do usuário
-  col_acao: "acesso_inicial_chatbot"  // Ação realizada
-}
-```
-
-### Coleção: sessoesChat (Histórico)
-```javascript
-{
-  sessionId: "sessao_1234567890_abc123",
-  userId: "anonimo",
-  botId: "chatbotDioSama",
-  startTime: "2024-01-15T14:30:00.000Z",
-  endTime: "2024-01-15T14:45:00.000Z",
-  messages: [
-    {
-      role: "user",
-      parts: [{ text: "Olá Dio-sama" }]
-    },
-    {
-      role: "model", 
-      parts: [{ text: "MUDA MUDA! Você ousa..." }]
-    }
-  ],
-  loggedAt: "2024-01-15T14:45:00.000Z"
-}
-```
-
-## 🎭 Personalidade do Dio-Sama
-
-O chatbot foi programado com as seguintes características:
-
-- **Arrogância**: Sempre se considera superior
-- **Dramaticidade**: Respostas teatrais e grandiosas
-- **Frases Icônicas**: "MUDA MUDA MUDA!", "WRYYY!", "Você pensou que era X, mas era eu, DIO!"
-- **Inteligência**: Demonstra conhecimento superior
-- **Majestade**: Mantém tom intimidador e majestoso
-
-## 🔧 Resolução de Problemas
-
-### Erros Comuns
-
-1. **"Cannot find module 'express'"**
-   - Verifique se `npm install` foi executado
-   - Confirme que `package.json` está correto
-
-2. **"GEMINI_API_KEY não definida"**
-   - Verifique se a variável está no `.env`
-   - No Render, confirme se foi adicionada nas Environment Variables
-
-3. **Erro de CORS**
-   - Verifique se o middleware CORS está configurado
-   - Confirme se as URLs estão corretas
-
-4. **Falha na conexão MongoDB**
-   - Verifique as strings de conexão
-   - Confirme se o IP está liberado no Network Access
-
-## 📝 Licença
-
-Este projeto é desenvolvido para fins educacionais. JoJo's Bizarre Adventure é propriedade de Hirohiko Araki.
+O servidor estará rodando em `http://localhost:3000`
 
 ---
 
-**MUDA MUDA MUDA!** 🧛‍♂️✨
+## 📖 Documentação da API
 
+### Endpoints Principais
+
+#### 💬 Chat
+```http
+POST /api/chat
+Content-Type: application/json
+
+{
+  "message": "Qual o clima hoje?",
+  "chatHistory": [],
+  "sessionId": "uuid-da-sessao"
+}
+```
+
+#### 🌤️ Clima
+```http
+GET /api/clima/:cidade
+```
+
+#### 🕐 Horário
+```http
+GET /api/horario
+```
+
+#### 🔐 Admin Login
+```http
+POST /api/admin/login
+Content-Type: application/json
+
+{
+  "password": "senha_admin"
+}
+```
+
+#### 📊 Estatísticas (Requer Auth)
+```http
+GET /api/admin/stats
+Authorization: Bearer {token}
+```
+
+---
+
+## 📂 Estrutura do Projeto
+
+```
+dio-sama-chatbot/
+├── server.js              # Servidor principal Express
+├── package.json           # Dependências
+├── .env                   # Variáveis de ambiente (não versionado)
+├── .gitignore            # Arquivos ignorados
+├── README.md             # Este arquivo
+└── public/               # Frontend
+    ├── index.html        # Página principal
+    ├── admin.html        # Painel admin
+    ├── style.css         # Estilos temáticos
+    ├── client.js         # Lógica do chat
+    └── admin.js          # Lógica do painel admin
+```
+
+---
+
+## 🚀 Deploy
+
+### Deploy no Render (Backend)
+
+1. Crie uma conta no [Render.com](https://render.com)
+2. Novo Web Service → Conecte seu repositório GitHub
+3. Configure:
+   - **Build Command**: `npm install`
+   - **Start Command**: `npm start`
+   - **Environment Variables**: Adicione todas as variáveis do `.env`
+4. Deploy! 🎉
+
+### Deploy no Netlify (Frontend)
+
+1. Crie uma conta no [Netlify](https://netlify.com)
+2. Conecte seu repositório
+3. Configure:
+   - **Publish directory**: `public`
+   - Adicione variável `REACT_APP_BACKEND_URL` com a URL do Render
+4. Deploy automático! 🎉
+
+---
+
+## 🗄️ Banco de Dados
+
+### Estrutura MongoDB
+
+**Coleção: `sessoesChat`**
+```javascript
+{
+  sessionId: "uuid",
+  messages: [
+    { role: "user", parts: [{ text: "mensagem" }] },
+    { role: "model", parts: [{ text: "resposta" }] }
+  ],
+  createdAt: ISODate,
+  lastUpdated: ISODate
+}
+```
+
+---
+
+## 🎨 Personalização
+
+### Modificar Personalidade do Bot
+
+Edite a constante `DIO_PERSONALITY` no arquivo `server.js`:
+
+```javascript
+const DIO_PERSONALITY = `
+Sua personalidade customizada aqui...
+`;
+```
+
+Ou use o painel admin para alterações dinâmicas!
+
+---
+
+## 🐛 Troubleshooting
+
+### Erro: "Cannot find module 'express'"
+```bash
+npm install
+```
+
+### Erro: "GEMINI_API_KEY não definida"
+Verifique se o arquivo `.env` está configurado corretamente
+
+### Erro de CORS
+Adicione a URL do seu frontend na lista de origens permitidas em `server.js`
+
+### MongoDB Connection Failed
+- Verifique as credenciais no `.env`
+- Libere seu IP no MongoDB Atlas Network Access
+
+---
+
+## 🤝 Contribuindo
+
+Contribuições são bem-vindas! Sinta-se à vontade para:
+
+1. Fork o projeto
+2. Crie uma branch (`git checkout -b feature/NovaFeature`)
+3. Commit suas mudanças (`git commit -m 'Adiciona NovaFeature'`)
+4. Push para a branch (`git push origin feature/NovaFeature`)
+5. Abra um Pull Request
+
+---
+
+## 📝 Licença
+
+Este projeto é desenvolvido para fins educacionais. 
+
+**JoJo's Bizarre Adventure** é propriedade de **Hirohiko Araki**.
+
+---
+
+## 👨‍💻 Desenvolvedor
+
+**Projeto desenvolvido por**: [Seu Nome]
+- 📧 Email: seu.email@exemplo.com
+- 🐙 GitHub: [@seu-usuario](https://github.com/seu-usuario)
+- 💼 LinkedIn: [Seu Nome](https://linkedin.com/in/seu-perfil)
+
+---
+
+## 🙏 Agradecimentos
+
+- **Hirohiko Araki** pela criação de JoJo's Bizarre Adventure
+- **Google** pela API Gemini
+- **OpenWeather** pelos dados meteorológicos
+- **MongoDB** pela infraestrutura de banco de dados
+- **Professores e colegas** pelo suporte durante o desenvolvimento
+
+---
+
+<div align="center">
+
+### 🧛‍♂️ "WRYYY! MUDA MUDA MUDA!" 🧛‍♂️
+
+**[⬆ Voltar ao topo](#-diomini---chatbot-do-dio-sama)**
+
+</div>
